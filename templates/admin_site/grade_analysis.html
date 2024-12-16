@@ -1,0 +1,123 @@
+<!-- templates/admin_site/grade_analysis.html -->
+
+{% extends 'admin_site/base.html' %}
+
+{% block extra_head %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+    <div class="container mt-4">
+        <h2>成绩分析</h2>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-4">
+                        <select name="subject" class="form-select">
+                            <option value="">选择科目</option>
+                            {% for subject in subjects %}
+                                <option value="{{ subject.id }}"
+                                        {% if selected_subject == subject.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ subject.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <select name="time_range" class="form-select">
+                            <option value="week" {% if time_range == 'week' %}selected{% endif %}>最近一周</option>
+                            <option value="month" {% if time_range == 'month' %}selected{% endif %}>最近一月</option>
+                            <option value="year" {% if time_range == 'year' %}selected{% endif %}>最近一年</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-primary">分析</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if selected_subject %}
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">成绩概览</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>考试总数：{{ stats.total_exams }}</p>
+                            <p>平均分：{{ stats.average_score|default_if_none:0|floatformat:1 }}</p>
+                            <canvas id="scoreDistribution"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">班级平均分对比</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="classComparison"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                // 成绩分布图
+                const scoreDistributionCtx = document.getElementById('scoreDistribution');
+                new Chart(scoreDistributionCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: [{% for item in stats.score_distribution %}'{{ item.total_score }}分',{% endfor %}],
+                        datasets: [{
+                            label: '学生人数',
+                            data: [{% for item in stats.score_distribution %}{{ item.count }},{% endfor %}],
+                            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+
+                // 班级对比图
+                const classComparisonCtx = document.getElementById('classComparison');
+                new Chart(classComparisonCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: [{% for item in stats.class_averages %}'{{ item.student__userprofile__class_id__name }}',{% endfor %}],
+                        datasets: [{
+                            label: '班级平均分',
+                            data: [{% for item in stats.class_averages %}{{ item.avg_score|default_if_none:0|floatformat:1 }},{% endfor %}],
+                            backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            </script>
+        {% else %}
+            <div class="alert alert-info">
+                请选择科目查看成绩分析
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

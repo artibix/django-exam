@@ -1,0 +1,72 @@
+<!-- templates/admin_site/teacher_list.html -->
+
+{% extends 'admin_site/base.html' %}
+
+{% block content %}
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>教师管理</h2>
+            <a href="{% url 'admin_site:teacher_create' %}" class="btn btn-primary">
+                添加教师
+            </a>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-10">
+                        {{ form.search_term }}
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">搜索</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                        <tr>
+                            <th>用户名</th>
+                            <th>姓名</th>
+                            <th>邮箱</th>
+                            <th>手机号</th>
+                            <th>性别</th>
+                            <th>操作</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for teacher in teachers %}
+                            <tr>
+                                <td>{{ teacher.user.username }}</td>
+                                <td>{{ teacher.user.last_name }}{{ teacher.user.first_name }}</td>
+                                <td>{{ teacher.user.email }}</td>
+                                <td>{{ teacher.phone }}</td>
+                                <td>{{ teacher.get_gender_display }}</td>
+                                <td>
+                                    <a href="{% url 'admin_site:teacher_edit' teacher.pk %}"
+                                       class="btn btn-sm btn-outline-primary">
+                                        编辑
+                                    </a>
+                                    <a href="{% url 'admin_site:teacher_delete' teacher.pk %}"
+                                       class="btn btn-sm btn-outline-danger"
+                                       onclick="return confirm('确定要删除该教师吗？')">
+                                        删除
+                                    </a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center">暂无教师信息</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

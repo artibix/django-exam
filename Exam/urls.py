@@ -17,6 +17,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+from users.views import unified_login
+
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('', unified_login, name='login'),  # Root URL for login
+    path('users/', include('users.urls')),  # 将统一登录页面设为首页
+    path('admin/', include('admin_site.urls')),
+    path('teacher/', include('teacher.urls')),
+    # path('student/', include('student.urls')),
 ]

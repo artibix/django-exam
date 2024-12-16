@@ -1,0 +1,35 @@
+<!-- templates/admin_site/dashboard.html -->
+
+{% extends 'admin_site/base.html' %}
+
+{% block content %}
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">教师管理</h5>
+                    </div>
+                    <div class="card-body">
+                        <h2 class="display-4 mb-4">{{ teacher_count }}</h2>
+                        <p class="mb-0">共计教师数量</p>
+                        <a href="{% url 'admin_site:teacher_list' %}" class="btn btn-primary mt-3">管理教师</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">学生管理</h5>
+                    </div>
+                    <div class="card-body">
+                        <h2 class="display-4 mb-4">{{ student_count }}</h2>
+                        <p class="mb-0">共计学生数量</p>
+                        <a href="{% url 'admin_site:student_list' %}" class="btn btn-primary mt-3">管理学生</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

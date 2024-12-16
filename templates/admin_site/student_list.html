@@ -1,0 +1,77 @@
+<!-- templates/admin_site/student_list.html -->
+
+{% extends 'admin_site/base.html' %}
+
+{% block content %}
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>学生管理</h2>
+            <a href="{% url 'admin_site:student_create' %}" class="btn btn-primary">
+                添加学生
+            </a>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-6">
+                        {{ form.search_term }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.class_id }}
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">搜索</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                        <tr>
+                            <th>用户名</th>
+                            <th>姓名</th>
+                            <th>班级</th>
+                            <th>邮箱</th>
+                            <th>手机号</th>
+                            <th>性别</th>
+                            <th>操作</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for student in students %}
+                            <tr>
+                                <td>{{ student.user.username }}</td>
+                                <td>{{ student.user.last_name }}{{ student.user.first_name }}</td>
+                                <td>{{ student.class_id.name }}</td>
+                                <td>{{ student.user.email }}</td>
+                                <td>{{ student.phone }}</td>
+                                <td>{{ student.get_gender_display }}</td>
+                                <td>
+                                    <a href="{% url 'admin_site:student_edit' student.pk %}"
+                                       class="btn btn-sm btn-outline-primary">
+                                        编辑
+                                    </a>
+                                    <a href="{% url 'admin_site:student_delete' student.pk %}"
+                                       class="btn btn-sm btn-outline-danger"
+                                       onclick="return confirm('确定要删除该学生吗？')">
+                                        删除
+                                    </a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center">暂无学生信息</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
