@@ -1,0 +1,95 @@
+<!-- templates/teacher/exam_paper_preview.html -->
+
+{% extends 'teacher/base.html' %}
+
+{% block content %}
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">{{ exam_paper.name }} - 预览</h4>
+                    <div>
+                        {% if exam_paper.status == 'draft' %}
+                            <form method="post" style="display: inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-success"
+                                        onclick="return confirm('确定要发布此试卷吗？')">
+                                    发布试卷
+                                </button>
+                            </form>
+                            <a href="{% url 'teacher:exam_paper_questions' exam_paper.id %}"
+                               class="btn btn-primary">编辑试题</a>
+                        {% endif %}
+                        <a href="{% url 'teacher:exam_paper_list' %}" class="btn btn-secondary">返回列表</a>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- 试卷信息 -->
+                <div class="mb-4">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <p><strong>科目：</strong>{{ exam_paper.subject.name }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>总分：</strong>{{ total_score }}分</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>题目数量：</strong>{{ question_count }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>考试时长：</strong>{{ exam_paper.duration }}分钟</p>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-6">
+                            <p><strong>开始时间：</strong>{{ exam_paper.start_time|date:"Y-m-d H:i" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>结束时间：</strong>{{ exam_paper.end_time|date:"Y-m-d H:i" }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- 试题内容 -->
+                {% for type, questions in questions_by_type.items %}
+                    <div class="question-section mb-4">
+                        <h5 class="mb-3">{{ type }}</h5>
+                        {% for exam_question in questions %}
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div class="question-number">
+                                            {{ forloop.counter }}. {{ exam_question.question.content }}
+                                        </div>
+                                        <div class="question-score">
+                                            （{{ exam_question.score }}分）
+                                        </div>
+                                    </div>
+                                    {% if exam_question.question.type == 'choice' and exam_question.question.options %}
+                                        <div class="options mt-3">
+                                            {% for option in exam_question.question.options.options %}
+                                                <div class="option">
+                                                    {{ forloop.counter }}. {{ option }}
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="answer mt-3">
+                                        <strong>参考答案：</strong>{{ exam_question.question.correct_answer }}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% empty %}
+                    <div class="alert alert-warning">
+                        当前试卷还没有试题，请先添加试题。
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

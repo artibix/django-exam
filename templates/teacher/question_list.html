@@ -1,0 +1,133 @@
+<!-- templates/teacher/question_list.html -->
+
+{% extends 'teacher/base.html' %}
+
+{% block content %}
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>题库管理</h2>
+            <a href="{% url 'teacher:question_create' %}" class="btn btn-primary">
+                创建试题
+            </a>
+        </div>
+
+        <!-- 筛选表单 -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <select name="subject" class="form-select">
+                            <option value="">所有科目</option>
+                            {% for subject in subjects %}
+                                <option value="{{ subject.id }}" {% if current_subject == subject.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ subject.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select name="type" class="form-select">
+                            <option value="">所有题型</option>
+                            {% for type_code, type_name in question_types %}
+                                <option value="{{ type_code }}" {% if current_type == type_code %}selected{% endif %}>
+                                    {{ type_name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" name="search" class="form-control"
+                               placeholder="搜索题目内容..." value="{{ search_term|default:'' }}">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">搜索</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 试题列表 -->
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                        <tr>
+                            <th>题目内容</th>
+                            <th>科目</th>
+                            <th>题型</th>
+                            <th>分值</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for question in questions %}
+                            <tr>
+                                <td>{{ question.content|truncatechars:50 }}</td>
+                                <td>{{ question.subject.name }}</td>
+                                <td>{{ question.get_type_display }}</td>
+                                <td>{{ question.score }}</td>
+                                <td>{{ question.created_at|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    <div class="btn-group">
+                                        <button type="button" class="btn btn-sm btn-outline-info"
+                                                data-bs-toggle="modal" data-bs-target="#questionModal{{ question.id }}">
+                                            查看
+                                        </button>
+                                        <a href="{% url 'teacher:question_edit' question.id %}"
+                                           class="btn btn-sm btn-outline-primary">
+                                            编辑
+                                        </a>
+                                        <a href="{% url 'teacher:question_delete' question.id %}"
+                                           class="btn btn-sm btn-outline-danger"
+                                           onclick="return confirm('确定要删除这道试题吗？')">
+                                            删除
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- 试题详情模态框 -->
+                            <div class="modal fade" id="questionModal{{ question.id }}" tabindex="-1">
+                                <div class="modal-dialog modal-lg">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">试题详情</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <h6>题目内容：</h6>
+                                            <p>{{ question.content }}</p>
+
+                                            {% if question.type == 'choice' and question.options %}
+                                                <h6>选项：</h6>
+                                                <ul>
+                                                    {% for option in question.options.options %}
+                                                        <li>{{ option }}</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            {% endif %}
+
+                                            <h6>正确答案：</h6>
+                                            <p>{{ question.correct_answer }}</p>
+
+                                            <div class="text-muted">
+                                                <small>分值：{{ question.score }}分</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center">暂无试题</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

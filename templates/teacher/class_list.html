@@ -1,0 +1,49 @@
+<!-- templates/teacher/class_list.html -->
+
+{% extends 'teacher/base.html' %}
+
+{% block content %}
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>班级管理</h2>
+            <a href="{% url 'teacher:class_create' %}" class="btn btn-primary">
+                添加班级
+            </a>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                        <tr>
+                            <th>班级名称</th>
+                            <th>科目</th>
+                            <th>操作</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for teacher_class in teacher_classes %}
+                            <tr>
+                                <td>{{ teacher_class.class_id.name }}</td>
+                                <td>{{ teacher_class.subject.name }}</td>
+                                <td>
+                                    <a href="{% url 'teacher:class_delete' teacher_class.id %}"
+                                       class="btn btn-sm btn-outline-danger"
+                                       onclick="return confirm('确定要移除该班级吗？')">
+                                        移除
+                                    </a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center">暂无班级</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

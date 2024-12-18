@@ -4,15 +4,128 @@
 
 {% block content %}
     <div class="container mt-4">
-        <div class="row">
+        <div class="row mb-4">
             <div class="col-md-12">
+                <h2>欢迎回来，{{ request.user.get_full_name }}</h2>
+                <p class="lead text-muted">教师系统仪表板</p>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- 试卷统计 -->
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 border-primary">
+                    <div class="card-body">
+                        <h5 class="card-title">试卷管理</h5>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h2 class="mb-0">{{ exam_papers_count }}</h2>
+                                <p class="text-muted">已创建试卷</p>
+                            </div>
+                            <div>
+                                <a href="{% url 'teacher:exam_paper_list' %}" class="btn btn-primary">管理试卷</a>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="small">
+                            <div>草稿：{{ draft_papers_count }}</div>
+                            <div>已发布：{{ published_papers_count }}</div>
+                            <div>已结束：{{ ended_papers_count }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 班级统计 -->
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 border-success">
+                    <div class="card-body">
+                        <h5 class="card-title">班级管理</h5>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h2 class="mb-0">{{ classes_count }}</h2>
+                                <p class="text-muted">任教班级</p>
+                            </div>
+                            <div>
+                                <a href="#" class="btn btn-success">查看班级</a>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="small">
+                            <div>总学生数：{{ students_count }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 最近考试 -->
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 border-info">
+                    <div class="card-body">
+                        <h5 class="card-title">考试管理</h5>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h2 class="mb-0">{{ ongoing_exams_count }}</h2>
+                                <p class="text-muted">进行中的考试</p>
+                            </div>
+                            <div>
+                                <a href="#" class="btn btn-info text-white">查看考试</a>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="small">
+                            <div>待批改：{{ pending_grading_count }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 最近试卷 -->
+        <div class="row">
+            <div class="col-md-12 mb-4">
                 <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">欢迎使用教师系统</h5>
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">最近的试卷</h5>
+                        <a href="{% url 'teacher:exam_paper_create' %}" class="btn btn-primary btn-sm">创建新试卷</a>
                     </div>
                     <div class="card-body">
-                        <h2>您好，{{ request.user.get_full_name }}</h2>
-                        <p class="lead">欢迎登录教师系统，您可以在这里管理学生、试卷和考试。</p>
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                <tr>
+                                    <th>试卷名称</th>
+                                    <th>科目</th>
+                                    <th>状态</th>
+                                    <th>创建时间</th>
+                                    <th>操作</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for paper in recent_papers %}
+                                    <tr>
+                                        <td>{{ paper.name }}</td>
+                                        <td>{{ paper.subject.name }}</td>
+                                        <td>
+                                        <span class="badge bg-{{ paper.status|yesno:'success,secondary' }}">
+                                            {{ paper.get_status_display }}
+                                        </span>
+                                        </td>
+                                        <td>{{ paper.created_at|date:"Y-m-d H:i" }}</td>
+                                        <td>
+                                            <a href="{% url 'teacher:exam_paper_preview' paper.id %}" class="btn btn-sm btn-outline-primary">
+                                                预览
+                                            </a>
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="5" class="text-center">暂无试卷</td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>

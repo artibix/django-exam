@@ -1,0 +1,67 @@
+<!-- templates/teacher/question_form.html -->
+
+{% extends 'teacher/base.html' %}
+
+{% block content %}
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="card-title mb-0">{{ title }}</h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="post">
+                            {% csrf_token %}
+                            {% if request.GET.next %}
+                                <input type="hidden" name="next" value="{{ request.GET.next }}">
+                            {% endif %}
+                            {% if exam_paper_id %}
+                                <input type="hidden" name="exam_paper_id" value="{{ exam_paper_id }}">
+                            {% endif %}
+                            {% for field in form %}
+                                <div class="mb-3">
+                                    {{ field.label_tag }}
+                                    {{ field }}
+                                    {% if field.help_text %}
+                                        <small class="form-text text-muted">{{ field.help_text }}</small>
+                                    {% endif %}
+                                    {% if field.errors %}
+                                        <div class="alert alert-danger mt-1">
+                                            {{ field.errors|join:', ' }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary">保存</button>
+                                <a href="{% url 'teacher:question_list' %}" class="btn btn-secondary">返回列表</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% block extra_scripts %}
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const typeSelect = document.querySelector('[name="type"]');
+                const optionsField = document.querySelector('[name="options_text"]').closest('.mb-3');
+
+                function toggleOptionsField() {
+                    if (typeSelect.value === 'choice') {
+                        optionsField.style.display = 'block';
+                    } else {
+                        optionsField.style.display = 'none';
+                    }
+                }
+
+                typeSelect.addEventListener('change', toggleOptionsField);
+                toggleOptionsField();  // 初始化显示状态
+            });
+        </script>
+    {% endblock %}
+
+{% endblock %}

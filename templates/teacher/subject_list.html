@@ -1,0 +1,55 @@
+<!-- templates/teacher/subject_list.html -->
+
+{% extends 'teacher/base.html' %}
+
+{% block content %}
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>科目管理</h2>
+            <a href="{% url 'teacher:subject_create' %}" class="btn btn-primary">
+                添加科目
+            </a>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                        <tr>
+                            <th>科目名称</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for subject in subjects %}
+                            <tr>
+                                <td>{{ subject.name }}</td>
+                                <td>{{ subject.created_at|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="{% url 'teacher:subject_edit' subject.id %}"
+                                           class="btn btn-sm btn-outline-primary">
+                                            编辑
+                                        </a>
+                                        <a href="{% url 'teacher:subject_delete' subject.id %}"
+                                           class="btn btn-sm btn-outline-danger"
+                                           onclick="return confirm('确定要删除该科目吗？')">
+                                            删除
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center">暂无科目</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,150 @@
+<!-- templates/teacher/exam_paper_questions.html -->
+
+{% extends 'teacher/base.html' %}
+
+{% block content %}
+    <div class="container mt-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4 class="mb-0">{{ exam_paper.name }} - 试题管理</h4>
+            </div>
+            <div class="card-body">
+                <!-- 试卷基本信息 -->
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <p><strong>科目：</strong>{{ exam_paper.subject.name }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <p><strong>考试时长：</strong>{{ exam_paper.duration }}分钟</p>
+                    </div>
+                    <div class="col-md-4">
+                        <p><strong>状态：</strong>{{ exam_paper.get_status_display }}</p>
+                    </div>
+                </div>
+
+                {% if available_questions.exists or current_questions %}
+                    <form method="post">
+                        {% csrf_token %}
+                        <!-- 已选试题列表 -->
+                        {% if current_questions %}
+                            <h5 class="mb-3">已选试题</h5>
+                            <div class="table-responsive mb-4">
+                                <table class="table table-bordered">
+                                    <thead>
+                                    <tr>
+                                        <th width="5%">选择</th>
+                                        <th width="50%">题目内容</th>
+                                        <th width="15%">题型</th>
+                                        <th width="15%">分值</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for eq in current_questions %}
+                                        <tr>
+                                            <td>
+                                                <input type="checkbox" name="questions" value="{{ eq.question.id }}"
+                                                       checked class="form-check-input">
+                                            </td>
+                                            <td>{{ eq.question.content }}</td>
+                                            <td>{{ eq.question.get_type_display }}</td>
+                                            <td>
+                                                <input type="number" name="score_{{ eq.question.id }}"
+                                                       value="{{ eq.score }}" class="form-control">
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% endif %}
+
+                        <!-- 可选试题列表 -->
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">可选试题</h5>
+                            <a href="{% url 'teacher:question_create' %}?subject={{ exam_paper.subject.id }}&next=exam_paper_questions"
+                               class="btn btn-primary">
+                                添加新试题
+                            </a>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead>
+                                <tr>
+                                    <th width="5%">选择</th>
+                                    <th width="50%">题目内容</th>
+                                    <th width="15%">题型</th>
+                                    <th width="15%">分值</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for question in available_questions %}
+                                    <tr>
+                                        <td>
+                                            <input type="checkbox" name="questions" value="{{ question.id }}"
+                                                   class="form-check-input">
+                                        </td>
+                                        <td>{{ question.content }}</td>
+                                        <td>{{ question.get_type_display }}</td>
+                                        <td>
+                                            <input type="number" name="score_{{ question.id }}"
+                                                   value="{{ question.score }}" class="form-control">
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center">暂无可选试题</td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary">保存试题选择</button>
+                            <a href="{% url 'teacher:exam_paper_list' %}" class="btn btn-secondary">返回列表</a>
+                        </div>
+                    </form>
+                {% else %}
+                    <div class="alert alert-info">
+                        当前科目下还没有试题。
+                        <a href="?add_question=1" class="alert-link">点击这里添加新试题</a>
+                    </div>
+                {% endif %}
+
+                {% if question_form %}
+                    <!-- 快速添加试题表单 -->
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">添加新试题</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" action="{% url 'teacher:question_create' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{% url 'teacher:exam_paper_questions' exam_paper.id %}">
+                                {% for field in question_form %}
+                                    <div class="mb-3">
+                                        {{ field.label_tag }}
+                                        {{ field }}
+                                        {% if field.help_text %}
+                                            <small class="form-text text-muted">{{ field.help_text }}</small>
+                                        {% endif %}
+                                        {% if field.errors %}
+                                            <div class="alert alert-danger mt-1">
+                                                {{ field.errors|join:', ' }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                                <div class="d-grid gap-2">
+                                    <button type="submit" class="btn btn-primary">保存试题</button>
+                                    <a href="{% url 'teacher:exam_paper_questions' exam_paper.id %}"
+                                       class="btn btn-secondary">取消</a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

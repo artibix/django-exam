@@ -21,6 +21,19 @@
                 <li class="nav-item">
                     <a class="nav-link" href="{% url 'teacher:dashboard' %}">首页</a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'teacher:subject_list' %}">科目管理</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'teacher:class_list' %}">班级管理</a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'teacher:question_list' %}">试题管理</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'teacher:exam_paper_list' %}">试卷管理</a>
+                </li>
             </ul>
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item">
