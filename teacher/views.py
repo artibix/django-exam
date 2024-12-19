@@ -1,7 +1,7 @@
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.utils import timezone
 
 from users.models import Class, UserProfile
@@ -10,7 +10,8 @@ from .forms import TeacherLoginForm, QuestionForm, TeacherClassForm, SubjectForm
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from .forms import ExamPaperForm, QuestionSelectionForm
-from teacher.models import ExamPaper, ExamQuestion, TeacherClass, Question, Subject
+from teacher.models import ExamPaper, ExamQuestion, TeacherClass, Question, Subject, StudentExam, StudentAnswer
+from django.db.models import Count, Avg
 
 
 def teacher_login(request):
@@ -487,3 +488,214 @@ def class_delete(request, pk):
         messages.error(request, f'移除失败：{str(e)}')
 
     return redirect('teacher:class_list')
+
+
+@login_required
+def exam_list(request):
+    """考试列表视图"""
+    # 获取当前教师的所有试卷及其状态
+    exams = ExamPaper.objects.filter(created_by=request.user).select_related('subject')
+
+    # 为每个考试统计参加人数和完成人数
+    for exam in exams:
+        exam.participant_count = StudentExam.objects.filter(exam_paper=exam).count()
+        exam.completed_count = StudentExam.objects.filter(
+            exam_paper=exam,
+            submitted_at__isnull=False
+        ).count()
+        # 计算考试状态
+        now = timezone.now()
+        if exam.status == 'published':
+            if now < exam.start_time:
+                exam.status_display = '待开始'
+            elif now > exam.end_time:
+                exam.status_display = '已结束'
+            else:
+                exam.status_display = '进行中'
+        else:
+            exam.status_display = exam.get_status_display()
+
+    context = {
+        'exams': exams,
+        'now': timezone.now()
+    }
+    return render(request, 'teacher/exam_list.html', context)
+
+
+@login_required
+def exam_detail(request, pk):
+    """考试详情视图"""
+    exam = get_object_or_404(ExamPaper, pk=pk, created_by=request.user)
+
+    # 获取考试的统计信息
+    student_exams = StudentExam.objects.filter(exam_paper=exam)
+    stats = {
+        'total_students': student_exams.count(),
+        'submitted_count': student_exams.filter(submitted_at__isnull=False).count(),
+        'average_score': student_exams.filter(total_score__isnull=False).aggregate(
+            Avg('total_score')
+        )['total_score__avg'],
+        'need_grading': student_exams.filter(
+            submitted_at__isnull=False,
+            total_score__isnull=True
+        ).count()
+    }
+
+    # 获取参加考试的学生列表
+    students = student_exams.select_related(
+        'student__userprofile',
+        'student__userprofile__class_id'
+    ).order_by('student__userprofile__class_id', 'student__username')
+
+    context = {
+        'exam': exam,
+        'stats': stats,
+        'students': students,
+        'now': timezone.now()
+    }
+    return render(request, 'teacher/exam_detail.html', context)
+
+
+@login_required
+def exam_grade(request, exam_id, student_id):
+    """评分视图"""
+    student_exam = get_object_or_404(
+        StudentExam,
+        exam_paper_id=exam_id,
+        student_id=student_id,
+        exam_paper__created_by=request.user
+    )
+
+    if request.method == 'POST':
+        # 处理评分
+        for answer in student_exam.studentanswer_set.all():
+            score = request.POST.get(f'score_{answer.id}')
+            if score is not None:
+                try:
+                    answer.score = int(score)
+                    answer.save()
+                except ValueError:
+                    messages.error(request, f'无效的分数格式：{score}')
+                    return redirect('teacher:exam_grade', exam_id=exam_id, student_id=student_id)
+
+        # 计算总分
+        total_score = student_exam.studentanswer_set.aggregate(
+            total=Sum('score')
+        )['total'] or 0
+        student_exam.total_score = total_score
+        student_exam.save()
+
+        messages.success(request, '评分完成！')
+        return redirect('teacher:exam_detail', pk=exam_id)
+
+    answers = student_exam.studentanswer_set.select_related('question').all()
+    context = {
+        'student_exam': student_exam,
+        'answers': answers
+    }
+    return render(request, 'teacher/exam_grade.html', context)
+
+
+# teacher/views.py
+
+@login_required
+def exam_publish(request, pk):
+    """发布考试视图"""
+    exam_paper = get_object_or_404(ExamPaper, pk=pk, created_by=request.user)
+
+    try:
+        # 检查试卷是否满足发布条件
+        if exam_paper.status != 'draft':
+            messages.error(request, '只能发布草稿状态的试卷')
+            return redirect('teacher:exam_detail', pk=pk)
+
+        if exam_paper.question_count == 0:
+            messages.error(request, '试卷必须包含至少一道试题')
+            return redirect('teacher:exam_detail', pk=pk)
+
+        if not exam_paper.start_time or not exam_paper.end_time:
+            messages.error(request, '请设置考试开始和结束时间')
+            return redirect('teacher:exam_detail', pk=pk)
+
+        # 获取教师教授的班级学生
+        teacher_classes = TeacherClass.objects.filter(
+            teacher=request.user,
+            subject=exam_paper.subject
+        ).values_list('class_id', flat=True)
+
+        students = UserProfile.objects.filter(
+            role='student',
+            class_id__in=teacher_classes
+        ).select_related('user')
+
+        # 为每个学生创建考试记录
+        student_exams = []
+        for profile in students:
+            student_exams.append(StudentExam(
+                student=profile.user,
+                exam_paper=exam_paper
+            ))
+
+        with transaction.atomic():
+            # 更新试卷状态
+            exam_paper.status = 'published'
+            exam_paper.save()
+
+            # 批量创建学生考试记录
+            StudentExam.objects.bulk_create(student_exams)
+
+        messages.success(request, '考试发布成功')
+
+    except Exception as e:
+        messages.error(request, f'发布失败：{str(e)}')
+
+    return redirect('teacher:exam_detail', pk=pk)
+
+
+@login_required
+def exam_close(request, pk):
+    """关闭考试视图"""
+    exam_paper = get_object_or_404(ExamPaper, pk=pk, created_by=request.user)
+
+    try:
+        if exam_paper.status != 'published':
+            messages.error(request, '只能关闭已发布的考试')
+            return redirect('teacher:exam_detail', pk=pk)
+
+        with transaction.atomic():
+            # 更新试卷状态
+            exam_paper.status = 'ended'
+            exam_paper.end_time = timezone.now()
+            exam_paper.save()
+
+            # 自动提交所有未交卷的考试记录
+            unsubmitted_exams = StudentExam.objects.filter(
+                exam_paper=exam_paper,
+                status='in_progress'
+            )
+
+            for student_exam in unsubmitted_exams:
+                student_exam.status = 'submitted'
+                student_exam.submitted_at = timezone.now()
+
+            StudentExam.objects.bulk_update(
+                unsubmitted_exams,
+                ['status', 'submitted_at']
+            )
+
+            # 对客观题进行自动评分
+            student_answers = StudentAnswer.objects.filter(
+                student_exam__exam_paper=exam_paper,
+                score__isnull=True,
+                question__type__in=['choice', 'true_false']
+            )
+
+            for answer in student_answers:
+                answer.auto_grade()
+
+        messages.success(request, '考试已关闭，客观题已自动评分')
+
+    except Exception as e:
+        messages.error(request, f'关闭失败：{str(e)}')
+
+    return redirect('teacher:exam_detail', pk=pk)

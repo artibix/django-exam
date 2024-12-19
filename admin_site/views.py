@@ -4,6 +4,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.shortcuts import render
 from django.contrib.auth.models import User
+
+from teacher.models import Subject, StudentExam
 from users.models import UserProfile, Class
 from django.contrib import messages
 from .forms import TeacherForm, StudentForm, ClassForm, TeacherSearchForm, StudentSearchForm

@@ -1,0 +1,58 @@
+<!-- templates/teacher/exam_list.html -->
+
+{% extends 'teacher/base.html' %}
+
+{% block content %}
+    <div class="container mt-4">
+        <h2>考试管理</h2>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                        <tr>
+                            <th>试卷名称</th>
+                            <th>科目</th>
+                            <th>考试时间</th>
+                            <th>状态</th>
+                            <th>参加人数</th>
+                            <th>已交卷</th>
+                            <th>操作</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for exam in exams %}
+                            <tr>
+                                <td>{{ exam.name }}</td>
+                                <td>{{ exam.subject.name }}</td>
+                                <td>
+                                    {{ exam.start_time|date:"Y-m-d H:i" }} 至<br>
+                                    {{ exam.end_time|date:"Y-m-d H:i" }}
+                                </td>
+                                <td>
+                                <span class="badge bg-{{ exam.status_display|yesno:'success,warning,secondary' }}">
+                                    {{ exam.status_display }}
+                                </span>
+                                </td>
+                                <td>{{ exam.participant_count }}</td>
+                                <td>{{ exam.completed_count }}/{{ exam.participant_count }}</td>
+                                <td>
+                                    <a href="{% url 'teacher:exam_detail' exam.id %}"
+                                       class="btn btn-sm btn-primary">
+                                        查看详情
+                                    </a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center">暂无考试</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -47,7 +47,7 @@
                                 <p class="text-muted">任教班级</p>
                             </div>
                             <div>
-                                <a href="#" class="btn btn-success">查看班级</a>
+                                <a href="{% url 'teacher:class_list' %}" class="btn btn-success">查看班级</a>
                             </div>
                         </div>
                         <hr>
@@ -69,7 +69,7 @@
                                 <p class="text-muted">进行中的考试</p>
                             </div>
                             <div>
-                                <a href="#" class="btn btn-info text-white">查看考试</a>
+                                <a href="{% url 'teacher:exam_list' %}" class="btn btn-info text-white">查看考试</a>
                             </div>
                         </div>
                         <hr>

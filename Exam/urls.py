@@ -24,5 +24,5 @@ urlpatterns = [
     path('users/', include('users.urls')),  # 将统一登录页面设为首页
     path('admin/', include('admin_site.urls')),
     path('teacher/', include('teacher.urls')),
-    # path('student/', include('student.urls')),
+    path('student/', include('student.urls')),
 ]
