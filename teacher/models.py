@@ -27,7 +27,7 @@ class Subject(models.Model):
 class Question(models.Model):
     """试题模型"""
     QUESTION_TYPES = (
-        ('choice', '选择题'),
+        ('single_choice', '单选题'),
         ('true_false', '判断题'),
         ('subjective', '主观题'),
     )
@@ -48,9 +48,13 @@ class Question(models.Model):
         null=True,
         blank=True,
         verbose_name='选项',
-        help_text='选择题选项，JSON格式'
+        help_text='单选题选项，格式：{"A": "选项内容", "B": "选项内容", ...}'
     )
-    correct_answer = models.TextField(verbose_name='正确答案')
+    correct_answer = models.CharField(
+        max_length=255,
+        verbose_name='正确答案',
+        help_text='单选题填写选项字母(A/B/C/D)，判断题填写(T/F)'
+    )
     score = models.PositiveIntegerField(verbose_name='分值')
     created_by = models.ForeignKey(
         User,
@@ -69,6 +73,25 @@ class Question(models.Model):
     def __str__(self):
         return f'{self.get_type_display()}: {self.content[:50]}'
 
+    def get_formatted_options(self):
+        """获取格式化的选项"""
+        if self.type == 'single_choice' and self.options:
+            return [f"{k}. {v}" for k, v in self.options.items()]
+        return []
+
+    def is_objective(self):
+        """是否为客观题"""
+        return self.type in ['single_choice', 'true_false']
+
+    def check_answer(self, student_answer):
+        """检查答案是否正确"""
+        if not self.is_objective():
+            return None
+
+        if self.type == 'single_choice':
+            return student_answer.strip().upper() == self.correct_answer.strip().upper()
+        elif self.type == 'true_false':
+            return student_answer.strip().upper() == self.correct_answer.strip().upper()
 
 class ExamPaper(models.Model):
     """试卷模型"""
@@ -286,3 +309,18 @@ class StudentAnswer(models.Model):
 
     def __str__(self):
         return f"{self.student_exam.student.username} - {self.question.content[:20]}"
+
+    def auto_grade(self):
+        """自动评分"""
+        if not self.question.is_objective():
+            return False
+
+        student_answer = self.answer_text.strip()
+        if self.question.check_answer(student_answer):
+            self.score = self.question.score
+        else:
+            self.score = 0
+
+        self.auto_graded = True
+        self.save()
+        return True

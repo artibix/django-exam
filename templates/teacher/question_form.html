@@ -48,19 +48,31 @@
         <script>
             document.addEventListener('DOMContentLoaded', function() {
                 const typeSelect = document.querySelector('[name="type"]');
-                const optionsField = document.querySelector('[name="options_text"]').closest('.mb-3');
+                const singleChoiceFields = document.querySelectorAll('[name^="option_"]').map(el => el.closest('.mb-3'));
+                const correctAnswerField = document.querySelector('[name="correct_answer"]');
 
-                function toggleOptionsField() {
-                    if (typeSelect.value === 'choice') {
-                        optionsField.style.display = 'block';
+                function updateForm() {
+                    const selectedType = typeSelect.value;
+
+                    // 更新选项字段显示
+                    singleChoiceFields.forEach(field => {
+                        field.style.display = selectedType === 'single_choice' ? 'block' : 'none';
+                    });
+
+                    // 更新正确答案提示
+                    if (selectedType === 'single_choice') {
+                        correctAnswerField.placeholder = '请输入正确选项(A/B/C/D)';
+                    } else if (selectedType === 'true_false') {
+                        correctAnswerField.placeholder = '请输入T(正确)或F(错误)';
                     } else {
-                        optionsField.style.display = 'none';
+                        correctAnswerField.placeholder = '请输入参考答案';
                     }
                 }
 
-                typeSelect.addEventListener('change', toggleOptionsField);
-                toggleOptionsField();  // 初始化显示状态
+                typeSelect.addEventListener('change', updateForm);
+                updateForm();
             });
+        </script>
         </script>
     {% endblock %}
 

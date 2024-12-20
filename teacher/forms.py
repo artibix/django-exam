@@ -88,16 +88,10 @@ class QuestionSelectionForm(forms.Form):
 
 class QuestionForm(forms.ModelForm):
     """试题表单"""
-    options_text = forms.CharField(
-        label='选项',
-        required=False,
-        widget=forms.Textarea(attrs={
-            'class': 'form-control',
-            'rows': 4,
-            'placeholder': '每行输入一个选项，例如：\nA. 选项1\nB. 选项2'
-        }),
-        help_text='选择题必填，每行输入一个选项'
-    )
+    option_a = forms.CharField(required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    option_b = forms.CharField(required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    option_c = forms.CharField(required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    option_d = forms.CharField(required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
 
     class Meta:
         model = Question
@@ -110,43 +104,48 @@ class QuestionForm(forms.ModelForm):
                 'rows': 4,
                 'placeholder': '请输入题目内容'
             }),
-            'correct_answer': forms.Textarea(attrs={
+            'correct_answer': forms.TextInput(attrs={
                 'class': 'form-control',
-                'rows': 2,
-                'placeholder': '请输入正确答案'
+                'placeholder': '单选题填写A/B/C/D，判断题填写T/F'
             }),
             'score': forms.NumberInput(attrs={
                 'class': 'form-control',
-                'placeholder': '请输入分值'
             })
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # 如果是编辑模式，显示已有的选项
         instance = kwargs.get('instance')
-        if instance and instance.type == 'choice' and instance.options:
-            options = instance.options.get('options', [])
-            self.fields['options_text'].initial = '\n'.join(options)
+        if instance and instance.type == 'single_choice' and instance.options:
+            for key, value in instance.options.items():
+                field_name = f'option_{key.lower()}'
+                if hasattr(self, field_name):
+                    self.fields[field_name].initial = value
 
     def clean(self):
         cleaned_data = super().clean()
         question_type = cleaned_data.get('type')
-        options_text = cleaned_data.get('options_text', '')
+        correct_answer = cleaned_data.get('correct_answer', '').strip().upper()
 
-        if question_type == 'choice':
-            # 处理选择题选项
-            if not options_text.strip():
-                raise forms.ValidationError('选择题必须包含选项')
+        if question_type == 'single_choice':
+            # 验证选项
+            options = {}
+            for key in ['A', 'B', 'C', 'D']:
+                value = cleaned_data.get(f'option_{key.lower()}', '').strip()
+                if not value:
+                    raise forms.ValidationError(f'选项{key}不能为空')
+                options[key] = value
 
-            # 将选项文本分割成列表，去除空行
-            options_list = [opt.strip() for opt in options_text.split('\n') if opt.strip()]
+            # 验证答案
+            if correct_answer not in ['A', 'B', 'C', 'D']:
+                raise forms.ValidationError('单选题答案必须是A、B、C、D之一')
 
-            if len(options_list) < 2:
-                raise forms.ValidationError('选择题至少需要两个选项')
+            cleaned_data['options'] = options
 
-            # 保存选项到cleaned_data
-            cleaned_data['options'] = {'options': options_list}
+        elif question_type == 'true_false':
+            if correct_answer not in ['T', 'F']:
+                raise forms.ValidationError('判断题答案必须是T或F')
+            cleaned_data['options'] = None
         else:
             cleaned_data['options'] = None
 
@@ -154,18 +153,13 @@ class QuestionForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-
-        # 保存选项
-        if self.cleaned_data.get('type') == 'choice':
-            instance.options = self.cleaned_data.get('options')
+        if instance.type == 'single_choice':
+            instance.options = self.cleaned_data['options']
         else:
             instance.options = None
-
         if commit:
             instance.save()
-
         return instance
-
 
 class SubjectForm(forms.ModelForm):
     class Meta:

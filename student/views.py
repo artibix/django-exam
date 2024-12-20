@@ -1,7 +1,7 @@
 # student/views.py
 from django.urls import reverse
 
-from teacher.models import StudentExam, StudentAnswer
+from teacher.models import StudentExam, StudentAnswer, Question
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -145,6 +145,18 @@ def exam_submit(request, pk):
         with transaction.atomic():
             # 更新或创建答案
             if question_id:
+                question = get_object_or_404(Question, id=question_id)
+                # 处理选择题答案
+                if question.type == 'single_choice':
+                    # 将数字选项转换为字母选项
+                    if answer_text.isdigit():
+                        # 1->A, 2->B, 3->C, 4->D
+                        answer_text = chr(64 + int(answer_text))
+
+                # 处理判断题答案
+                elif question.type == 'true_false':
+                    answer_text = 'T' if answer_text.lower() == 'true' else 'F'
+
                 answer, _ = StudentAnswer.objects.get_or_create(
                     student_exam=student_exam,
                     question_id=question_id,
@@ -207,11 +219,11 @@ def auto_grade_answers(student_exam):
     """自动评分工具函数"""
     answers = StudentAnswer.objects.filter(
         student_exam=student_exam,
-        question__type__in=['choice', 'true_false']
+        question__type__in=['single_choice', 'true_false']
     ).select_related('question')
 
     for answer in answers:
-        if answer.answer_text.strip() == answer.question.correct_answer.strip():
+        if answer.question.check_answer(answer.answer_text):
             answer.score = answer.question.score
         else:
             answer.score = 0
