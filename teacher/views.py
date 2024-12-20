@@ -563,32 +563,46 @@ def exam_grade(request, exam_id, student_id):
         StudentExam,
         exam_paper_id=exam_id,
         student_id=student_id,
-        exam_paper__created_by=request.user
+        exam_paper__created_by=request.user,
+        status='submitted'  # 只能评阅已提交的试卷
     )
 
     if request.method == 'POST':
-        # 处理评分
-        for answer in student_exam.studentanswer_set.all():
-            score = request.POST.get(f'score_{answer.id}')
-            if score is not None:
-                try:
-                    answer.score = int(score)
-                    answer.save()
-                except ValueError:
-                    messages.error(request, f'无效的分数格式：{score}')
-                    return redirect('teacher:exam_grade', exam_id=exam_id, student_id=student_id)
+        try:
+            with transaction.atomic():
+                # 处理每道题的得分
+                for answer in student_exam.student_answers.all():
+                    score = request.POST.get(f'score_{answer.id}')
+                    if score is not None:
+                        try:
+                            score = float(score)
+                            if score < 0 or score > answer.question.score:
+                                raise ValueError('分数超出范围')
+                            answer.score = score
+                            answer.save()
+                        except ValueError:
+                            messages.error(request, f'无效的分数格式：{score}')
+                            return redirect('teacher:exam_grade', exam_id=exam_id, student_id=student_id)
 
-        # 计算总分
-        total_score = student_exam.studentanswer_set.aggregate(
-            total=Sum('score')
-        )['total'] or 0
-        student_exam.total_score = total_score
-        student_exam.save()
+                # 计算总分
+                total_score = student_exam.student_answers.aggregate(
+                    total=Sum('score')
+                )['total'] or 0
 
-        messages.success(request, '评分完成！')
-        return redirect('teacher:exam_detail', pk=exam_id)
+                student_exam.total_score = total_score
+                student_exam.status = 'graded'
+                student_exam.save()
 
-    answers = student_exam.studentanswer_set.select_related('question').all()
+                messages.success(request, '评分完成！')
+                return redirect('teacher:exam_detail', pk=exam_id)
+
+        except Exception as e:
+            messages.error(request, f'评分失败：{str(e)}')
+            return redirect('teacher:exam_grade', exam_id=exam_id, student_id=student_id)
+
+    # 获取所有答案及相关的试题信息
+    answers = student_exam.student_answers.select_related('question').all()
+
     context = {
         'student_exam': student_exam,
         'answers': answers

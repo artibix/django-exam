@@ -1,9 +1,12 @@
 # exam/models.py
 
-from django.db import models
 from django.contrib.auth.models import User
 
 from users.models import Class
+
+from django.db import models
+from django.contrib.auth.models import User
+from django.utils import timezone
 
 
 class Subject(models.Model):
@@ -174,11 +177,6 @@ class TeacherClass(models.Model):
         return f'{self.teacher.get_full_name()} - {self.class_id.name} - {self.subject.name}'
 
 
-from django.db import models
-from django.contrib.auth.models import User
-from django.utils import timezone
-
-
 class StudentExam(models.Model):
     """学生考试记录模型"""
     student = models.ForeignKey(
@@ -251,18 +249,15 @@ class StudentAnswer(models.Model):
     student_exam = models.ForeignKey(
         StudentExam,
         on_delete=models.CASCADE,
-        related_name='student_answers',
+        related_name='student_answers',  # 添加 related_name
         verbose_name='考试记录'
     )
     question = models.ForeignKey(
-        'Question',
+        Question,
         on_delete=models.CASCADE,
-        related_name='student_answers',
         verbose_name='试题'
     )
-    answer_text = models.TextField(
-        verbose_name='答案内容'
-    )
+    answer_text = models.TextField(verbose_name='答案内容')
     score = models.DecimalField(
         max_digits=5,
         decimal_places=1,
@@ -291,13 +286,3 @@ class StudentAnswer(models.Model):
 
     def __str__(self):
         return f"{self.student_exam.student.username} - {self.question.content[:20]}"
-
-    def auto_grade(self):
-        """自动评分（用于客观题）"""
-        if self.question.type in ['choice', 'true_false']:
-            if self.answer_text.strip() == self.question.correct_answer.strip():
-                self.score = self.question.score
-            else:
-                self.score = 0
-            self.auto_graded = True
-            self.save()
