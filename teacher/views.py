@@ -713,3 +713,35 @@ def exam_close(request, pk):
         messages.error(request, f'关闭失败：{str(e)}')
 
     return redirect('teacher:exam_detail', pk=pk)
+
+
+@login_required
+def exam_view_result(request, exam_id, student_id):
+    """查看学生已评分的试卷"""
+    student_exam = get_object_or_404(
+        StudentExam,
+        exam_paper_id=exam_id,
+        student_id=student_id,
+        exam_paper__created_by=request.user,
+        status__in=['submitted', 'graded']  # 只能查看已提交或已评分的试卷
+    )
+
+    # 获取所有答案及相关的试题信息
+    answers = (student_exam.student_answers.select_related('question')
+               .order_by('question__type', 'question_id'))
+
+    # 按题型分组
+    answers_by_type = {}
+    for answer in answers:
+        question_type = answer.question.get_type_display()
+        if question_type not in answers_by_type:
+            answers_by_type[question_type] = []
+        answers_by_type[question_type].append(answer)
+
+    context = {
+        'student_exam': student_exam,
+        'answers_by_type': answers_by_type,
+        'total_score': student_exam.total_score or 0,
+        'can_edit': student_exam.status != 'graded'  # 已评分的试卷不能再编辑
+    }
+    return render(request, 'teacher/exam_view_result.html', context)

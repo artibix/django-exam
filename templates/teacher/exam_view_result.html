@@ -1,0 +1,120 @@
+<!-- templates/teacher/exam_view_result.html -->
+
+{% extends 'teacher/base.html' %}
+
+{% block content %}
+    <div class="container mt-4">
+        <!-- 试卷基本信息 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">{{ student_exam.exam_paper.name }} - 评阅结果</h4>
+                    <div>
+                        {% if can_edit %}
+                            <a href="{% url 'teacher:exam_grade' student_exam.exam_paper.id student_exam.student.id %}"
+                               class="btn btn-primary">继续评分</a>
+                        {% endif %}
+                        <a href="{% url 'teacher:exam_detail' student_exam.exam_paper.id %}"
+                           class="btn btn-secondary">返回考试详情</a>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <p><strong>学生姓名：</strong>{{ student_exam.student.get_full_name }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p><strong>科目：</strong>{{ student_exam.exam_paper.subject.name }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p><strong>提交时间：</strong>{{ student_exam.submitted_at|date:"Y-m-d H:i:s" }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p><strong>总分：</strong>{{ total_score }}/{{ student_exam.exam_paper.total_score }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 答题情况 -->
+        {% for question_type, answers in answers_by_type.items %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">{{ question_type }}</h5>
+                </div>
+                <div class="card-body">
+                    {% for answer in answers %}
+                        <div class="mb-4 pb-3 border-bottom">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <h6 class="mb-3">{{ forloop.counter }}. {{ answer.question.content }}</h6>
+                                <span class="badge {% if answer.score == answer.question.score %}bg-success{% elif answer.score == 0 %}bg-danger{% else %}bg-warning{% endif %}">
+                        得分：{{ answer.score|default_if_none:'-' }}/{{ answer.question.score }}
+                    </span>
+                            </div>
+
+                            <!-- 选择题选项 -->
+                            {% if answer.question.type == 'single_choice' %}
+                                <div class="options mb-3">
+                                    {% for key, value in answer.question.options.items %}
+                                        <div class="option {% if key == answer.question.correct_answer %}text-success{% endif %} 
+                                     {% if key == answer.answer_text and key != answer.question.correct_answer %}text-danger{% endif %}">
+                                            {{ key }}. {{ value }}
+                                            {% if key == answer.question.correct_answer %}<i class="fas fa-check text-success"></i>{% endif %}
+                                            {% if key == answer.answer_text and key != answer.question.correct_answer %}<i class="fas fa-times text-danger"></i>{% endif %}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+
+                            <!-- 判断题答案 -->
+                            {% if answer.question.type == 'true_false' %}
+                                <div class="student-answer mb-2">
+                                    <strong>学生答案：</strong>
+                                    {% if answer.answer_text == 'T' %}正确{% else %}错误{% endif %}
+                                    {% if answer.answer_text == answer.question.correct_answer %}
+                                        <i class="fas fa-check text-success"></i>
+                                    {% else %}
+                                        <i class="fas fa-times text-danger"></i>
+                                    {% endif %}
+                                </div>
+                                <div class="correct-answer">
+                                    <strong>正确答案：</strong>
+                                    {% if answer.question.correct_answer == 'T' %}正确{% else %}错误{% endif %}
+                                </div>
+                            {% endif %}
+
+                            <!-- 主观题答案 -->
+                            {% if answer.question.type == 'subjective' %}
+                                <div class="mb-3">
+                                    <p><strong>学生答案：</strong></p>
+                                    <div class="border p-3 bg-light">
+                                        {{ answer.answer_text|linebreaks }}
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <p><strong>参考答案：</strong></p>
+                                    <div class="border p-3 bg-light">
+                                        {{ answer.question.correct_answer|linebreaks }}
+                                    </div>
+                                </div>
+                            {% endif %}
+
+                            <!-- 评分说明 -->
+                            {% if answer.score is not None and answer.score != answer.question.score %}
+                                <div class="mt-2 text-danger">
+                                    扣分原因：
+                                    {% if answer.question.is_objective %}
+                                        答案错误
+                                    {% else %}
+                                        教师评分
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% endblock %}

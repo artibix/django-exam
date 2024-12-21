@@ -106,7 +106,7 @@ class QuestionForm(forms.ModelForm):
             }),
             'correct_answer': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': '单选题填写A/B/C/D，判断题填写T/F'
+                'placeholder': '单选题填写A/B/C/D，判断题填写T/F，主观题填写答案'
             }),
             'score': forms.NumberInput(attrs={
                 'class': 'form-control',
@@ -160,6 +160,7 @@ class QuestionForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
 
 class SubjectForm(forms.ModelForm):
     class Meta:

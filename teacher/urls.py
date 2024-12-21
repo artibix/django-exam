@@ -34,4 +34,7 @@ urlpatterns = [
     path('exams/<int:exam_id>/grade/<int:student_id>/', views.exam_grade, name='exam_grade'),  # 评分界面
     path('exams/publish/<int:pk>/', views.exam_publish, name='exam_publish'),  # 发布考试
     path('exams/close/<int:pk>/', views.exam_close, name='exam_close'),  # 关闭考试
+    path('exams/<int:exam_id>/grade/<int:student_id>/view/',
+         views.exam_view_result,
+         name='exam_view_result'),
 ]

@@ -82,7 +82,7 @@
                                             评分
                                         </a>
                                     {% elif student_exam.total_score is not None %}
-                                        <a href="{% url 'teacher:exam_grade' exam.id student_exam.student.id %}"
+                                        <a href="{% url 'teacher:exam_view_result' exam.id student_exam.student.id %}"
                                            class="btn btn-sm btn-outline-primary">
                                             查看
                                         </a>

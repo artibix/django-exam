@@ -8,8 +8,12 @@
             <div class="card-header">
                 <div class="d-flex justify-content-between align-items-center">
                     <h4 class="mb-0">评阅试卷</h4>
-                    <a href="{% url 'teacher:exam_detail' student_exam.exam_paper.id %}"
-                       class="btn btn-secondary">返回考试详情</a>
+                    <div>
+                        <a href="{% url 'teacher:exam_view_result' student_exam.exam_paper.id student_exam.student.id %}"
+                           class="btn btn-info">查看评阅结果</a>
+                        <a href="{% url 'teacher:exam_detail' student_exam.exam_paper.id %}"
+                           class="btn btn-secondary">返回考试详情</a>
+                    </div>
                 </div>
             </div>
             <div class="card-body">
