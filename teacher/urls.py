@@ -41,4 +41,8 @@ urlpatterns = [
     path('exams/<int:exam_id>/grade/<int:student_id>/view/',
          views.exam_view_result,
          name='exam_view_result'),
+    # 通知
+    path('announcements/', views.AnnouncementListView.as_view(), name='announcement_list'),
+    path('announcements/create/', views.AnnouncementCreateView.as_view(), name='announcement_create'),
+    path('announcements/<int:pk>/read/', views.mark_announcement_as_read, name='mark_announcement_read'),
 ]

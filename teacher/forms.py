@@ -4,7 +4,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-from teacher.models import ExamPaper, Question, Subject, TeacherClass, Exam
+from teacher.models import ExamPaper, Question, Subject, TeacherClass, Exam, Announcement
 from users.models import Class
 
 
@@ -27,6 +27,7 @@ class TeacherLoginForm(forms.Form):
 
 class ExamPaperForm(forms.ModelForm):
     """试卷基本信息表单"""
+
     class Meta:
         model = ExamPaper
         fields = ['name', 'subject']
@@ -204,4 +205,19 @@ class TeacherClassForm(forms.ModelForm):
         widgets = {
             'class_id': forms.Select(attrs={'class': 'form-control'}),
             'subject': forms.Select(attrs={'class': 'form-control'})
+        }
+
+
+class AnnouncementForm(forms.ModelForm):
+    """通知表单"""
+
+    class Meta:
+        model = Announcement
+        fields = ['title', 'content', 'type', 'receiver_class', 'receiver']
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-control'}),
+            'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+            'type': forms.Select(attrs={'class': 'form-control'}),
+            'receiver_class': forms.Select(attrs={'class': 'form-control'}),
+            'receiver': forms.Select(attrs={'class': 'form-control'})
         }

@@ -371,3 +371,55 @@ class StudentAnswer(models.Model):
         self.auto_graded = True
         self.save()
         return True
+
+
+# teacher/models.py 中添加
+
+class Announcement(models.Model):
+    """通知公告模型"""
+    ANNOUNCEMENT_TYPES = (
+        ('all', '全体通知'),
+        ('class', '班级通知'),
+        ('personal', '个人通知')
+    )
+
+    title = models.CharField(max_length=255, verbose_name='标题')
+    content = models.TextField(verbose_name='内容')
+    sender = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='sent_announcements',
+        verbose_name='发送者'
+    )
+    receiver_class = models.ForeignKey(
+        'users.Class',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='received_announcements',
+        verbose_name='接收班级'
+    )
+    receiver = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='received_announcements',
+        verbose_name='接收者'
+    )
+    type = models.CharField(
+        max_length=20,
+        choices=ANNOUNCEMENT_TYPES,
+        default='all',
+        verbose_name='通知类型'
+    )
+    is_read = models.BooleanField(default=False, verbose_name='是否已读')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+
+    class Meta:
+        verbose_name = '通知公告'
+        verbose_name_plural = '通知公告'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.title

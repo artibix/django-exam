@@ -1,0 +1,46 @@
+<!-- templates/shared/announcement_list_content.html -->
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4>通知列表</h4>
+        {% if user.userprofile.role != 'student' %}
+            <a href="{% url 'teacher:announcement_create' %}" class="btn btn-primary">
+                发布通知
+            </a>
+        {% endif %}
+    </div>
+
+    <div class="list-group">
+        {% for announcement in announcements %}
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-1">{{ announcement.title }}</h5>
+                    <small class="text-muted">{{ announcement.created_at|date:"Y-m-d H:i" }}</small>
+                </div>
+                <p class="mb-1">{{ announcement.content }}</p>
+                <div class="mt-2">
+                    <small class="text-muted">
+                        <strong>发送者:</strong>
+                        {% if announcement.sender.get_full_name %}
+                            {{ announcement.sender.get_full_name }}
+                        {% else %}
+                            {{ announcement.sender.username }}
+                        {% endif %}
+                        {% if announcement.type == 'class' %}
+                            <span class="mx-2">|</span>
+                            <strong>接收班级:</strong> {{ announcement.receiver_class.name }}
+                        {% elif announcement.type == 'personal' %}
+                            <span class="mx-2">|</span>
+                            <strong>接收者:</strong> {{ announcement.receiver.get_full_name|default:announcement.receiver.username }}
+                        {% endif %}
+                        <span class="mx-2">|</span>
+                        <strong>类型:</strong> {{ announcement.get_type_display }}
+                    </small>
+                </div>
+            </div>
+        {% empty %}
+            <div class="text-center py-4">
+                <p class="text-muted">暂无通知</p>
+            </div>
+        {% endfor %}
+    </div>
+</div>

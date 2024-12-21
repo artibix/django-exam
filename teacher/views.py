@@ -1,17 +1,23 @@
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models import Q, Sum
+from django.http import JsonResponse
+from django.urls import reverse_lazy
 from django.utils import timezone
+from django.views.generic import CreateView, ListView
 
 from users.models import Class, UserProfile
-from .forms import TeacherLoginForm, QuestionForm, TeacherClassForm, SubjectForm, ExamForm, ExamClassesForm
+from .forms import TeacherLoginForm, QuestionForm, TeacherClassForm, SubjectForm, ExamForm, ExamClassesForm, \
+    AnnouncementForm
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from .forms import ExamPaperForm, QuestionSelectionForm
-from teacher.models import ExamPaper, ExamQuestion, TeacherClass, Question, Subject, StudentExam, StudentAnswer, Exam
+from teacher.models import ExamPaper, ExamQuestion, TeacherClass, Question, Subject, StudentExam, StudentAnswer, Exam, \
+    Announcement
 from django.db.models import Count, Avg
 
 
@@ -926,3 +932,61 @@ def exam_view_result(request, exam_id, student_id):
         'can_edit': student_exam.status != 'graded'  # 已评分的试卷不能再编辑
     }
     return render(request, 'teacher/exam_view_result.html', context)
+
+
+class AnnouncementCreateView(LoginRequiredMixin, CreateView):
+    """创建通知视图"""
+    model = Announcement
+    form_class = AnnouncementForm
+    template_name = 'teacher/announcement_form.html'
+    success_url = reverse_lazy('teacher:announcement_list')
+
+    def form_valid(self, form):
+        form.instance.sender = self.request.user
+        return super().form_valid(form)
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        if self.request.user.userprofile.role == 'teacher':
+            # 教师只能给自己的班级发通知
+            form.fields['receiver_class'].queryset = Class.objects.filter(
+                teacher_classes__teacher=self.request.user
+            )
+        return form
+
+
+class AnnouncementListView(LoginRequiredMixin, ListView):
+    """通知列表视图"""
+    model = Announcement
+    template_name = 'teacher/announcement_list.html'
+    context_object_name = 'announcements'
+
+    def get_queryset(self):
+        user = self.request.user
+        profile = user.userprofile
+
+        queryset = Announcement.objects.select_related(
+            'sender',
+            'receiver_class',
+            'receiver'
+        )
+
+        if profile.role in ['admin', 'teacher']:
+            # 管理员和教师可以看到自己发送的所有通知
+            return queryset.filter(sender=user)
+        else:
+            # 学生只能看到发给自己的通知
+            return queryset.filter(
+                Q(type='all') |
+                Q(type='class', receiver_class=profile.class_id) |
+                Q(type='personal', receiver=user)
+            )
+
+
+@login_required
+def mark_announcement_as_read(request, pk):
+    """标记通知为已读"""
+    announcement = get_object_or_404(Announcement, pk=pk)
+    announcement.is_read = True
+    announcement.save()
+    return JsonResponse({'status': 'success'})
