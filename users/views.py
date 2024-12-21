@@ -61,5 +61,8 @@ def profile(request):
 
     # 根据用户角色返回对应的模板
     role = request.user.userprofile.role
-    template_name = f'{role}/profile.html'
+    if role == 'admin':
+        template_name = 'admin_site/profile.html'
+    else:
+        template_name = f'{role}/profile_base.html'
     return render(request, template_name, context)
