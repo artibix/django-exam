@@ -64,5 +64,5 @@ def profile(request):
     if role == 'admin':
         template_name = 'admin_site/profile.html'
     else:
-        template_name = f'{role}/profile_base.html'
+        template_name = f'{role}/profile.html'
     return render(request, template_name, context)
