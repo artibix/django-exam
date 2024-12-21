@@ -1,9 +1,9 @@
 # users/views.py
-
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
-from .forms import UnifiedLoginForm
+from .forms import UnifiedLoginForm, UserUpdateForm, ProfileUpdateForm
 
 
 def unified_login(request):
@@ -37,3 +37,29 @@ def unified_login(request):
 def logout_view(request):
     logout(request)
     return redirect('login')
+
+
+@login_required
+def profile(request):
+    if request.method == 'POST':
+        user_form = UserUpdateForm(request.POST, instance=request.user)
+        profile_form = ProfileUpdateForm(request.POST, instance=request.user.userprofile)
+
+        if user_form.is_valid() and profile_form.is_valid():
+            user_form.save()
+            profile_form.save()
+            messages.success(request, '个人信息更新成功')
+            return redirect('users:profile')
+    else:
+        user_form = UserUpdateForm(instance=request.user)
+        profile_form = ProfileUpdateForm(instance=request.user.userprofile)
+
+    context = {
+        'user_form': user_form,
+        'profile_form': profile_form,
+    }
+
+    # 根据用户角色返回对应的模板
+    role = request.user.userprofile.role
+    template_name = f'{role}/profile.html'
+    return render(request, template_name, context)

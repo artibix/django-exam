@@ -43,6 +43,12 @@
                     <span class="nav-link">{{ request.user.get_full_name }}</span>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'profile' %}active{% endif %}"
+                       href="{% url 'users:profile' %}">
+                        <i class="fas fa-user me-2"></i>个人中心
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" href="{% url 'users:logout' %}">退出登录</a>
                 </li>
             </ul>
