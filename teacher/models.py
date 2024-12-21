@@ -1,4 +1,4 @@
-# exam/models.py
+# teacher/models.py
 
 from django.contrib.auth.models import User
 
@@ -93,19 +93,14 @@ class Question(models.Model):
         elif self.type == 'true_false':
             return student_answer.strip().upper() == self.correct_answer.strip().upper()
 
+
 class ExamPaper(models.Model):
     """试卷模型"""
-    STATUS_CHOICES = (
-        ('draft', '草稿'),
-        ('published', '已发布'),
-        ('ended', '已结束'),
-    )
-
     name = models.CharField(max_length=255, verbose_name='试卷名称')
     subject = models.ForeignKey(
         Subject,
         on_delete=models.CASCADE,
-        related_name='exam_papers',
+        related_name='exam',
         verbose_name='所属科目'
     )
     total_score = models.PositiveIntegerField(verbose_name='总分')
@@ -113,26 +108,15 @@ class ExamPaper(models.Model):
         default=0,
         verbose_name='题目数量'
     )
-    duration = models.PositiveIntegerField(verbose_name='考试时长(分钟)')
-    start_time = models.DateTimeField(verbose_name='开始时间')
-    end_time = models.DateTimeField(verbose_name='结束时间')
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default='draft',
-        verbose_name='状态'
-    )
-    questions = models.ManyToManyField(
-        Question,
-        through='ExamQuestion',
-        related_name='exam_papers',
-        verbose_name='试题'
-    )
     created_by = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name='created_exam_papers',
         verbose_name='创建人'
+    )
+    is_template = models.BooleanField(
+        default=False,
+        verbose_name='是否为模板'
     )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
@@ -144,6 +128,71 @@ class ExamPaper(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Exam(models.Model):
+    """考试模型"""
+    STATUS_CHOICES = (
+        ('preparing', '准备中'),
+        ('in_progress', '进行中'),
+        ('ended', '已结束'),
+    )
+
+    name = models.CharField(max_length=255, verbose_name='考试名称')
+    exam_paper = models.ForeignKey(
+        ExamPaper,
+        on_delete=models.PROTECT,  # 防止删除正在使用的试卷
+        related_name='exams',
+        verbose_name='试卷'
+    )
+    classes = models.ManyToManyField(
+        Class,
+        related_name='exams',
+        verbose_name='参与班级'
+    )
+    duration = models.PositiveIntegerField(verbose_name='考试时长(分钟)')
+    start_time = models.DateTimeField(verbose_name='开始时间')
+    end_time = models.DateTimeField(verbose_name='结束时间')
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='preparing',
+        verbose_name='状态'
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='created_exams',
+        verbose_name='创建人'
+    )
+    description = models.TextField(
+        blank=True,
+        verbose_name='考试说明'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+
+    class Meta:
+        verbose_name = '考试'
+        verbose_name_plural = '考试'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name
+
+    def update_status(self):
+        """更新考试状态"""
+        now = timezone.now()
+        if now < self.start_time:
+            new_status = 'preparing'
+        elif self.start_time <= now <= self.end_time:
+            new_status = 'in_progress'
+        else:
+            new_status = 'ended'
+
+        if new_status != self.status:
+            self.status = new_status
+            self.save()
 
 
 class ExamQuestion(models.Model):
@@ -208,11 +257,13 @@ class StudentExam(models.Model):
         related_name='student_exams',
         verbose_name='学生'
     )
-    exam_paper = models.ForeignKey(
-        'ExamPaper',
+
+    exam = models.ForeignKey(  # 改为关联 Exam
+        'Exam',
         on_delete=models.CASCADE,
         related_name='student_exams',
-        verbose_name='试卷'
+        verbose_name='考试',
+        null=True
     )
     total_score = models.DecimalField(
         max_digits=5,
@@ -244,11 +295,11 @@ class StudentExam(models.Model):
     class Meta:
         verbose_name = '学生考试记录'
         verbose_name_plural = '学生考试记录'
-        unique_together = ['student', 'exam_paper']
+        unique_together = ['student', 'exam']
         ordering = ['-started_at']
 
     def __str__(self):
-        return f"{self.student.username} - {self.exam_paper.name}"
+        return f"{self.student.username} - {self.exam.name}"
 
     def submit(self):
         """提交试卷"""

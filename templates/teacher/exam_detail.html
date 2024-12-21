@@ -1,5 +1,4 @@
 <!-- templates/teacher/exam_detail.html -->
-
 {% extends 'teacher/base.html' %}
 
 {% block content %}
@@ -9,17 +8,17 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <h4 class="mb-0">{{ exam.name }} - 考试详情</h4>
                     <div>
-                        {% if exam.status == 'draft' %}
-                            <a href="{% url 'teacher:exam_publish' exam.id %}"
+                        {% if exam.status == 'preparing' %}
+                            <a href="{% url 'teacher:exam_start' exam.id %}"
                                class="btn btn-success"
-                               onclick="return confirm('确定要发布此考试吗？学生将可以开始答题。')">
-                                发布考试
+                               onclick="return confirm('确认开始考试吗？学生将可以开始答题。')">
+                                开始考试
                             </a>
-                        {% elif exam.status == 'published' %}
-                            <a href="{% url 'teacher:exam_close' exam.id %}"
+                        {% elif exam.status == 'in_progress' %}
+                            <a href="{% url 'teacher:exam_end' exam.id %}"
                                class="btn btn-warning"
-                               onclick="return confirm('确定要关闭考试吗？所有未提交的答卷将被自动提交。')">
-                                关闭考试
+                               onclick="return confirm('确定要结束考试吗？所有未提交的答卷将被自动提交。')">
+                                结束考试
                             </a>
                         {% endif %}
                         <a href="{% url 'teacher:exam_list' %}" class="btn btn-secondary">返回列表</a>
@@ -30,75 +29,116 @@
                 <!-- 考试基本信息 -->
                 <div class="row mb-4">
                     <div class="col-md-3">
-                        <h6 class="mb-2">基本信息</h6>
-                        <p><strong>科目：</strong>{{ exam.subject.name }}</p>
-                        <p><strong>总分：</strong>{{ exam.total_score }}分</p>
+                        <h6 class="mb-2">试卷信息</h6>
+                        <p><strong>科目：</strong>{{ exam.exam_paper.subject.name }}</p>
+                        <p><strong>总分：</strong>{{ exam.exam_paper.total_score }}分</p>
                         <p><strong>时长：</strong>{{ exam.duration }}分钟</p>
                     </div>
                     <div class="col-md-3">
                         <h6 class="mb-2">时间安排</h6>
                         <p><strong>开始：</strong>{{ exam.start_time|date:"Y-m-d H:i" }}</p>
                         <p><strong>结束：</strong>{{ exam.end_time|date:"Y-m-d H:i" }}</p>
+                        <p><strong>状态：</strong>
+                            <span class="badge {% if exam.status == 'preparing' %}bg-secondary
+                                         {% elif exam.status == 'in_progress' %}bg-success
+                                         {% else %}bg-info{% endif %}">
+                            {{ exam.get_status_display }}
+                        </span>
+                        </p>
                     </div>
-                    <div class="col-md-3">
-                        <h6 class="mb-2">参与情况</h6>
-                        <p><strong>参加人数：</strong>{{ stats.total_students }}人</p>
-                        <p><strong>已交卷：</strong>{{ stats.submitted_count }}人</p>
-                        <p><strong>待批改：</strong>{{ stats.need_grading }}份</p>
-                    </div>
-                    <div class="col-md-3">
-                        <h6 class="mb-2">成绩统计</h6>
-                        <p><strong>平均分：</strong>{{ stats.average_score|default_if_none:'-'|floatformat:1 }}分</p>
+                    <div class="col-md-6">
+                        <h6 class="mb-2">考试说明</h6>
+                        <p>{{ exam.description|default:"暂无说明"|linebreaks }}</p>
                     </div>
                 </div>
 
-                <!-- 学生列表 -->
-                <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
-                        <tr>
-                            <th>班级</th>
-                            <th>学号</th>
-                            <th>姓名</th>
-                            <th>开始时间</th>
-                            <th>交卷时间</th>
-                            <th>得分</th>
-                            <th>操作</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for student_exam in students %}
-                            <tr>
-                                <td>{{ student_exam.student.userprofile.class_id.name }}</td>
-                                <td>{{ student_exam.student.username }}</td>
-                                <td>{{ student_exam.student.get_full_name }}</td>
-                                <td>{{ student_exam.created_at|date:"Y-m-d H:i:s" }}</td>
-                                <td>{{ student_exam.submitted_at|default_if_none:'-'|date:"Y-m-d H:i:s" }}</td>
-                                <td>{{ student_exam.total_score|default_if_none:'-' }}</td>
-                                <td>
-                                    {% if student_exam.submitted_at and student_exam.total_score is None %}
-                                        <a href="{% url 'teacher:exam_grade' exam.id student_exam.student.id %}"
-                                           class="btn btn-sm btn-primary">
-                                            评分
-                                        </a>
-                                    {% elif student_exam.total_score is not None %}
-                                        <a href="{% url 'teacher:exam_view_result' exam.id student_exam.student.id %}"
-                                           class="btn btn-sm btn-outline-primary">
-                                            查看
-                                        </a>
-                                    {% else %}
-                                        <span class="text-muted">未交卷</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="7" class="text-center">暂无学生参加考试</td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
+                <!-- 班级统计信息 -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="mb-3">班级统计</h5>
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead>
+                                <tr>
+                                    <th>班级</th>
+                                    <th>应考人数</th>
+                                    <th>已交卷</th>
+                                    <th>已批改</th>
+                                    <th>平均分</th>
+                                    <th>及格率</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for class, stats in class_stats.items %}
+                                    <tr>
+                                        <td>{{ class.name }}</td>
+                                        <td>{{ stats.total }}</td>
+                                        <td>{{ stats.submitted }}/{{ stats.total }}</td>
+                                        <td>{{ stats.graded }}/{{ stats.submitted }}</td>
+                                        <td>{{ stats.average|default_if_none:'-'|floatformat:1 }}</td>
+                                        <td>{{ stats.pass_rate|default_if_none:'-'|floatformat:1 }}%</td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- 学生列表（按班级分组） -->
+                {% regroup student_exams by student.userprofile.class_id as class_groups %}
+                {% for class_group in class_groups %}
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">{{ class_group.grouper.name }}</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                    <tr>
+                                        <th>学号</th>
+                                        <th>姓名</th>
+                                        <th>开始时间</th>
+                                        <th>交卷时间</th>
+                                        <th>得分</th>
+                                        <th>状态</th>
+                                        <th>操作</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for student_exam in class_group.list %}
+                                        <tr>
+                                            <td>{{ student_exam.student.username }}</td>
+                                            <td>{{ student_exam.student.get_full_name }}</td>
+                                            <td>{{ student_exam.started_at|date:"Y-m-d H:i:s" }}</td>
+                                            <td>{{ student_exam.submitted_at|default_if_none:'-'|date:"Y-m-d H:i:s" }}</td>
+                                            <td>{{ student_exam.total_score|default_if_none:'-' }}</td>
+                                            <td>
+                                        <span class="badge {% if student_exam.status == 'not_started' %}bg-secondary
+                                                         {% elif student_exam.status == 'in_progress' %}bg-warning
+                                                         {% elif student_exam.status == 'submitted' %}bg-info
+                                                         {% else %}bg-success{% endif %}">
+                                            {{ student_exam.get_status_display }}
+                                        </span>
+                                            </td>
+                                            <td>
+                                                {% if student_exam.status == 'submitted' %}
+                                                    <a href="{% url 'teacher:exam_grade' exam.id student_exam.student.id %}"
+                                                       class="btn btn-sm btn-primary">评分</a>
+                                                {% elif student_exam.status == 'graded' %}
+                                                    <a href="{% url 'teacher:exam_view_result' exam.id student_exam.student.id %}"
+                                                       class="btn btn-sm btn-outline-info">查看</a>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
             </div>
         </div>
     </div>

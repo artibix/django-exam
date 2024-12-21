@@ -1,0 +1,81 @@
+<!-- templates/teacher/exam_form.html -->
+{% extends 'teacher/base.html' %}
+
+{% block content %}
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="card-title mb-0">{{ title }}</h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" id="examForm">
+                            {% csrf_token %}
+
+                            <!-- 科目选择 -->
+                            <div class="mb-3">
+                                {{ form.subject.label_tag }}
+                                {{ form.subject }}
+                                {{ form.subject.errors }}
+                            </div>
+
+                            <!-- 试卷选择 -->
+                            <div class="mb-3">
+                                {{ form.exam_paper.label_tag }}
+                                {{ form.exam_paper }}
+                                {{ form.exam_paper.errors }}
+                            </div>
+
+                            <!-- 其他考试信息字段 -->
+                            {% for field in form %}
+                                {% if field.name not in 'subject,exam_paper' %}
+                                    <div class="mb-3">
+                                        {{ field.label_tag }}
+                                        {{ field }}
+                                        {% if field.help_text %}
+                                            <small class="form-text text-muted">{{ field.help_text }}</small>
+                                        {% endif %}
+                                        {{ field.errors }}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+
+                            <!-- 班级选择 -->
+                            <div class="mb-3" id="classSelection">
+                                <h5 class="mb-3">选择参与班级</h5>
+                                {{ classes_form }}
+                            </div>
+
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary">创建考试</button>
+                                <a href="{% url 'teacher:exam_list' %}" class="btn btn-secondary">返回列表</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('examForm');
+            const subjectSelect = document.getElementById('id_subject');
+
+            // 当科目变化时提交表单，以更新试卷和班级列表
+            subjectSelect.addEventListener('change', function() {
+                // 添加一个标记表明这是一个更新请求
+                const updateInput = document.createElement('input');
+                updateInput.type = 'hidden';
+                updateInput.name = 'update_lists';
+                updateInput.value = 'true';
+                form.appendChild(updateInput);
+
+                form.submit();
+            });
+        });
+    </script>
+{% endblock %}

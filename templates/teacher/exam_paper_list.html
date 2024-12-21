@@ -1,14 +1,14 @@
 <!-- templates/teacher/exam_paper_list.html -->
-
 {% extends 'teacher/base.html' %}
 
 {% block content %}
     <div class="container mt-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2>试卷管理</h2>
-            <a href="{% url 'teacher:exam_paper_create' %}" class="btn btn-primary">
-                创建试卷
-            </a>
+            <div>
+                <a href="{% url 'teacher:create_exam_step1' %}" class="btn btn-success me-2">创建考试</a>
+                <a href="{% url 'teacher:exam_paper_create' %}" class="btn btn-primary">创建试卷</a>
+            </div>
         </div>
 
         {% if messages %}
@@ -20,7 +20,11 @@
             {% endfor %}
         {% endif %}
 
-        <div class="card">
+        <!-- 模板试卷 -->
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="card-title mb-0">试卷模板</h5>
+            </div>
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-striped">
@@ -28,52 +32,95 @@
                         <tr>
                             <th>试卷名称</th>
                             <th>科目</th>
-                            <th>总分</th>
                             <th>题目数量</th>
-                            <th>考试时长</th>
-                            <th>考试时间</th>
-                            <th>状态</th>
+                            <th>总分</th>
+                            <th>创建时间</th>
                             <th>操作</th>
                         </tr>
                         </thead>
                         <tbody>
-                        {% for paper in exam_papers %}
+                        {% for paper in template_papers %}
                             <tr>
                                 <td>{{ paper.name }}</td>
                                 <td>{{ paper.subject.name }}</td>
-                                <td>{{ paper.total_score }}</td>
                                 <td>{{ paper.question_count }}</td>
-                                <td>{{ paper.duration }}分钟</td>
-                                <td>
-                                    {{ paper.start_time|date:"Y-m-d H:i" }} 至<br>
-                                    {{ paper.end_time|date:"Y-m-d H:i" }}
-                                </td>
-                                <td>{{ paper.get_status_display }}</td>
+                                <td>{{ paper.total_score }}</td>
+                                <td>{{ paper.created_at|date:"Y-m-d H:i" }}</td>
                                 <td>
                                     <div class="btn-group">
-                                        <a href="{% url 'teacher:exam_paper_questions' paper.id %}"
-                                           class="btn btn-sm btn-outline-primary">
-                                            编辑试题
-                                        </a>
-                                        <a href="{% url 'teacher:exam_paper_edit' paper.id %}"
-                                           class="btn btn-sm btn-outline-secondary">
-                                            编辑信息
-                                        </a>
+                                        <a href="{% url 'teacher:exam_paper_create' %}?template_id={{ paper.id }}"
+                                           class="btn btn-sm btn-success">使用模板</a>
                                         <a href="{% url 'teacher:exam_paper_preview' paper.id %}"
-                                           class="btn btn-sm btn-outline-info">
-                                            预览
-                                        </a>
-                                        <a href="{% url 'teacher:exam_paper_delete' paper.id %}"
-                                           class="btn btn-sm btn-outline-danger"
-                                           onclick="return confirm('确定要删除该试卷吗？')">
-                                            删除
-                                        </a>
+                                           class="btn btn-sm btn-outline-info">预览</a>
+                                        <a href="{% url 'teacher:exam_paper_questions' paper.id %}"
+                                           class="btn btn-sm btn-outline-primary">编辑试题</a>
                                     </div>
                                 </td>
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="8" class="text-center">暂无试卷</td>
+                                <td colspan="6" class="text-center">暂无试卷模板</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 普通试卷 -->
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="card-title mb-0">试卷列表</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                        <tr>
+                            <th>试卷名称</th>
+                            <th>科目</th>
+                            <th>题目数量</th>
+                            <th>总分</th>
+                            <th>创建时间</th>
+                            <th>使用状态</th>
+                            <th>操作</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for paper in normal_papers %}
+                            <tr>
+                                <td>{{ paper.name }}</td>
+                                <td>{{ paper.subject.name }}</td>
+                                <td>{{ paper.question_count }}</td>
+                                <td>{{ paper.total_score }}</td>
+                                <td>{{ paper.created_at|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    {% if paper.exams.exists %}
+                                        <span class="badge bg-info">已使用</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">未使用</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="{% url 'teacher:exam_paper_preview' paper.id %}"
+                                           class="btn btn-sm btn-outline-info">预览</a>
+                                        {% if not paper.exams.exists %}
+                                            <a href="{% url 'teacher:exam_paper_questions' paper.id %}"
+                                               class="btn btn-sm btn-outline-primary">编辑试题</a>
+                                            <a href="{% url 'teacher:exam_paper_edit' paper.id %}"
+                                               class="btn btn-sm btn-outline-secondary">编辑信息</a>
+                                            <a href="{% url 'teacher:exam_paper_delete' paper.id %}"
+                                               class="btn btn-sm btn-outline-danger"
+                                               onclick="return confirm('确定要删除该试卷吗？')">删除</a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center">暂无试卷</td>
                             </tr>
                         {% endfor %}
                         </tbody>

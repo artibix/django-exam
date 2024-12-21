@@ -345,7 +345,7 @@ def grade_analysis(request):
 
     # 获取成绩数据
     student_exams = StudentExam.objects.select_related(
-        'exam_paper', 'student'
+        'exam', 'student'
     ).filter(
         created_at__gte=start_date,
         exam_paper__subject_id=selected_subject

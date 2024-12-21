@@ -30,7 +30,11 @@ urlpatterns = [
     path('classes/<int:pk>/delete/', views.class_delete, name='class_delete'),
     # 考试
     path('exams/', views.exam_list, name='exam_list'),  # 考试列表
+    path('exam/create/step1/', views.create_exam_step1, name='create_exam_step1'),
+    path('exam/create/step2/<int:exam_id>/', views.create_exam_step2, name='create_exam_step2'),
     path('exams/<int:pk>/', views.exam_detail, name='exam_detail'),  # 考试详情
+    path('exams/<int:pk>/start/', views.exam_start, name='exam_start'),
+    path('exams/<int:pk>/end/', views.exam_end, name='exam_end'),
     path('exams/<int:exam_id>/grade/<int:student_id>/', views.exam_grade, name='exam_grade'),  # 评分界面
     path('exams/publish/<int:pk>/', views.exam_publish, name='exam_publish'),  # 发布考试
     path('exams/close/<int:pk>/', views.exam_close, name='exam_close'),  # 关闭考试

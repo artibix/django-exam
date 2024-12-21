@@ -1,95 +1,94 @@
 <!-- templates/teacher/exam_grade.html -->
-
 {% extends 'teacher/base.html' %}
 
 {% block content %}
     <div class="container mt-4">
-        <div class="card mb-4">
+        <div class="card">
             <div class="card-header">
                 <div class="d-flex justify-content-between align-items-center">
-                    <h4 class="mb-0">评阅试卷</h4>
                     <div>
-                        <a href="{% url 'teacher:exam_view_result' student_exam.exam_paper.id student_exam.student.id %}"
-                           class="btn btn-info">查看评阅结果</a>
-                        <a href="{% url 'teacher:exam_detail' student_exam.exam_paper.id %}"
-                           class="btn btn-secondary">返回考试详情</a>
+                        <h4 class="mb-0">批改试卷</h4>
+                        <p class="mb-0 text-muted">
+                            {{ student_exam.student.get_full_name }} -
+                            {{ student_exam.exam.name }}
+                        </p>
                     </div>
+                    <a href="{% url 'teacher:exam_detail' student_exam.exam.id %}"
+                       class="btn btn-secondary">返回详情</a>
                 </div>
             </div>
-            <div class="card-body">
-                <!-- 考试基本信息 -->
-                <div class="row mb-4">
-                    <div class="col-md-4">
-                        <p><strong>试卷名称：</strong>{{ student_exam.exam_paper.name }}</p>
-                    </div>
-                    <div class="col-md-4">
-                        <p><strong>学生姓名：</strong>{{ student_exam.student.get_full_name }}</p>
-                    </div>
-                    <div class="col-md-4">
-                        <p><strong>提交时间：</strong>{{ student_exam.submitted_at|date:"Y-m-d H:i:s" }}</p>
-                    </div>
-                </div>
 
-                <!-- 评分表单 -->
-                <form method="post">
-                    {% csrf_token %}
-                    {% for answer in answers %}
-                        <div class="card mb-4">
-                            <div class="card-body">
-                                <!-- 题目信息 -->
-                                <div class="d-flex justify-content-between align-items-start mb-3">
-                                    <div>
-                                        <h5 class="mb-0">{{ forloop.counter }}. {{ answer.question.content }}</h5>
-                                        <small class="text-muted">
-                                            题型：{{ answer.question.get_type_display }} |
-                                            满分：{{ answer.question.score }}分
-                                        </small>
+            <form method="post">
+                {% csrf_token %}
+                <div class="card-body">
+                    <!-- 按题型分组显示答案 -->
+                    {% regroup answers by question.get_type_display as question_types %}
+                    {% for type in question_types %}
+                        <div class="question-section mb-4">
+                            <h5 class="mb-3">{{ type.grouper }}</h5>
+                            {% for answer in type.list %}
+                                <div class="card mb-3">
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-9">
+                                                <h6>{{ forloop.counter }}. {{ answer.question.content }}</h6>
+                                                {% if answer.question.type == 'single_choice' %}
+                                                    <div class="options mt-2">
+                                                        {% for key, value in answer.question.options.items %}
+                                                            <div class="option {% if key == answer.question.correct_answer %}text-success{% endif %}">
+                                                                {{ key }}. {{ value }}
+                                                                {% if key == answer.answer_text %}
+                                                                    {% if key == answer.question.correct_answer %}
+                                                                        <i class="fas fa-check text-success"></i>
+                                                                    {% else %}
+                                                                        <i class="fas fa-times text-danger"></i>
+                                                                    {% endif %}
+                                                                {% endif %}
+                                                            </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                {% else %}
+                                                    <div class="student-answer mt-2">
+                                                        <strong>学生答案：</strong>
+                                                        <div class="border p-2 mt-1">
+                                                            {{ answer.answer_text|linebreaks }}
+                                                        </div>
+                                                    </div>
+                                                    <div class="correct-answer mt-2">
+                                                        <strong>参考答案：</strong>
+                                                        <div class="border p-2 mt-1">
+                                                            {{ answer.question.correct_answer|linebreaks }}
+                                                        </div>
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="score-input">
+                                                    <label>得分（满分{{ answer.question.score }}分）：</label>
+                                                    <input type="number"
+                                                           name="score_{{ answer.id }}"
+                                                           class="form-control"
+                                                           value="{{ answer.score|default:0 }}"
+                                                           min="0"
+                                                           max="{{ answer.question.score }}"
+                                                           step="0.5"
+                                                           {% if answer.auto_graded %}readonly{% endif %}>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-
-                                <!-- 学生答案 -->
-                                <div class="mb-3">
-                                    <label class="form-label">学生答案：</label>
-                                    <div class="border p-3 bg-light">
-                                        {% if answer.question.type == 'choice' %}
-                                            选择：{{ answer.answer_text }}
-                                        {% else %}
-                                            {{ answer.answer_text|linebreaks }}
-                                        {% endif %}
-                                    </div>
-                                </div>
-
-                                <!-- 参考答案 -->
-                                <div class="mb-3">
-                                    <label class="form-label">参考答案：</label>
-                                    <div class="border p-3 bg-light">
-                                        {{ answer.question.correct_answer|linebreaks }}
-                                    </div>
-                                </div>
-
-                                <!-- 评分输入 -->
-                                <div class="mb-3">
-                                    <label class="form-label">得分：</label>
-                                    <input type="number" name="score_{{ answer.id }}"
-                                           class="form-control" style="width: 100px;"
-                                           value="{{ answer.score|default:0 }}"
-                                           min="0" max="{{ answer.question.score }}"
-                                           step="0.5" required
-                                           {% if answer.auto_graded %}disabled{% endif %}>
-                                    {% if answer.auto_graded %}
-                                        <small class="text-muted">（客观题已自动评分）</small>
-                                    {% endif %}
-                                </div>
-                            </div>
+                            {% endfor %}
                         </div>
                     {% endfor %}
 
-                    <!-- 提交按钮 -->
-                    <div class="d-grid gap-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <a href="{% url 'teacher:exam_detail' student_exam.exam.id %}"
+                           class="btn btn-secondary">返回详情</a>
                         <button type="submit" class="btn btn-primary">保存评分</button>
                     </div>
-                </form>
-            </div>
+                </div>
+            </form>
         </div>
     </div>
 {% endblock %}

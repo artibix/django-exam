@@ -1,16 +1,17 @@
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
+from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models import Q, Sum
 from django.utils import timezone
 
 from users.models import Class, UserProfile
-from .forms import TeacherLoginForm, QuestionForm, TeacherClassForm, SubjectForm
+from .forms import TeacherLoginForm, QuestionForm, TeacherClassForm, SubjectForm, ExamForm, ExamClassesForm
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from .forms import ExamPaperForm, QuestionSelectionForm
-from teacher.models import ExamPaper, ExamQuestion, TeacherClass, Question, Subject, StudentExam, StudentAnswer
+from teacher.models import ExamPaper, ExamQuestion, TeacherClass, Question, Subject, StudentExam, StudentAnswer, Exam
 from django.db.models import Count, Avg
 
 
@@ -46,9 +47,11 @@ def teacher_dashboard(request):
     # 获取试卷统计数据
     exam_papers = ExamPaper.objects.filter(created_by=request.user)
     exam_papers_count = exam_papers.count()
-    draft_papers_count = exam_papers.filter(status='draft').count()
-    published_papers_count = exam_papers.filter(status='published').count()
-    ended_papers_count = exam_papers.filter(status='ended').count()
+
+    # 在数据模型中没有定义试卷的状态字段,因此不能按状态过滤
+    # draft_papers_count = exam_papers.filter(status='draft').count()
+    # published_papers_count = exam_papers.filter(status='published').count()
+    # ended_papers_count = exam_papers.filter(status='ended').count()
 
     # 获取最近的试卷
     recent_papers = exam_papers.select_related('subject').order_by('-created_at')[:5]
@@ -66,28 +69,28 @@ def teacher_dashboard(request):
 
     # 获取考试统计
     now = timezone.now()
-    ongoing_exams_count = exam_papers.filter(
-        status='published',
+    ongoing_exams_count = Exam.objects.filter(  # 使用 Exam 模型
+        exam_paper__created_by=request.user,
         start_time__lte=now,
-        end_time__gte=now
+        end_time__gte=now,
+        status='in_progress'  # 使用 Exam 模型的 status 字段
     ).count()
 
     # 获取待批改试卷数量
-    # pending_grading_count = StudentExam.objects.filter(
-    #     exam_paper__created_by=request.user,
-    #     exam_paper__status='ended',
-    #     total_score__isnull=True
-    # ).count()
+    pending_grading_count = StudentExam.objects.filter(
+        exam__exam_paper__created_by=request.user,  # 通过 exam 关联 ExamPaper
+        status='submitted'  # 使用 StudentExam 模型的 status 字段
+    ).count()
 
     context = {
         'exam_papers_count': exam_papers_count,
-        'draft_papers_count': draft_papers_count,
-        'published_papers_count': published_papers_count,
-        'ended_papers_count': ended_papers_count,
+        # 'draft_papers_count': draft_papers_count,
+        # 'published_papers_count': published_papers_count,
+        # 'ended_papers_count': ended_papers_count,
         'classes_count': classes_count,
         'students_count': students_count,
         'ongoing_exams_count': ongoing_exams_count,
-        # 'pending_grading_count': pending_grading_count,
+        'pending_grading_count': pending_grading_count,
         'recent_papers': recent_papers,
     }
 
@@ -98,28 +101,279 @@ def teacher_dashboard(request):
 def exam_paper_list(request):
     """试卷列表视图"""
     exam_papers = ExamPaper.objects.filter(created_by=request.user).select_related('subject')
-    return render(request, 'teacher/exam_paper_list.html', {'exam_papers': exam_papers})
+
+    # 按模板和普通试卷分类
+    template_papers = exam_papers.filter(is_template=True)
+    normal_papers = exam_papers.filter(is_template=False)
+
+    context = {
+        'template_papers': template_papers,
+        'normal_papers': normal_papers
+    }
+    return render(request, 'teacher/exam_paper_list.html', context)
 
 
 @login_required
 def exam_paper_create(request):
     """创建试卷视图"""
+    # 支持从模板创建
+    template_id = request.GET.get('template_id')
+    template = None
+
+    if template_id:
+        template = get_object_or_404(ExamPaper, pk=template_id, created_by=request.user, is_template=True)
+
     if request.method == 'POST':
         form = ExamPaperForm(request.POST)
         if form.is_valid():
             exam_paper = form.save(commit=False)
             exam_paper.created_by = request.user
-            exam_paper.status = 'draft'
             exam_paper.save()
+
+            # 如果是从模板创建，复制试题
+            if template:
+                for eq in template.examquestion_set.all():
+                    ExamQuestion.objects.create(
+                        exam_paper=exam_paper,
+                        question=eq.question,
+                        score=eq.score
+                    )
+                exam_paper.total_score = template.total_score
+                exam_paper.question_count = template.question_count
+                exam_paper.save()
+
             messages.success(request, '试卷创建成功')
             return redirect('teacher:exam_paper_questions', pk=exam_paper.pk)
     else:
-        form = ExamPaperForm()
+        initial = {}
+        if template:
+            initial = {
+                'name': f'{template.name} - 副本',
+                'subject': template.subject,
+            }
+        form = ExamPaperForm(initial=initial)
 
-    return render(request, 'teacher/exam_paper_form.html', {
+    context = {
         'form': form,
-        'title': '创建试卷'
+        'title': '创建试卷',
+        'template': template
+    }
+    return render(request, 'teacher/exam_paper_form.html', context)
+
+
+@login_required
+def create_exam_step1(request):
+    """第一步：填写考试基本信息"""
+    if request.method == 'POST':
+        form = ExamForm(request.user, request.POST)
+        if form.is_valid():
+            exam = form.save(commit=False)
+            exam.created_by = request.user
+            exam.save()
+            return redirect('teacher:create_exam_step2', exam_id=exam.id)
+    else:
+        form = ExamForm(request.user)
+
+    return render(request, 'teacher/exam_form_step1.html', {
+        'form': form,
+        'title': '创建考试 - 基本信息'
     })
+
+
+@login_required
+def create_exam_step2(request, exam_id):
+    """第二步：选择参与班级"""
+    exam = get_object_or_404(Exam, id=exam_id, created_by=request.user)
+
+    if request.method == 'POST':
+        form = ExamClassesForm(request.user, exam.exam_paper, request.POST)
+        if form.is_valid():
+            with transaction.atomic():
+                # 保存选中的班级
+                exam.classes.set(form.cleaned_data['classes'])
+
+                # 为所选班级的学生创建考试记录
+                selected_classes = form.cleaned_data['classes']
+                students = User.objects.filter(
+                    userprofile__role='student',
+                    userprofile__class_id__in=selected_classes
+                )
+
+                student_exams = [
+                    StudentExam(
+                        student=student,
+                        exam=exam,
+                        status='in_progress'
+                    ) for student in students
+                ]
+                StudentExam.objects.bulk_create(student_exams)
+
+                messages.success(request, '考试创建成功！')
+                return redirect('teacher:exam_list')
+    else:
+        form = ExamClassesForm(request.user, exam.exam_paper)
+
+    return render(request, 'teacher/exam_form_step2.html', {
+        'form': form,
+        'exam': exam,
+        'title': '创建考试 - 选择班级'
+    })
+
+
+@login_required
+def exam_detail(request, pk):
+    """考试详情视图"""
+    exam = get_object_or_404(Exam, pk=pk, created_by=request.user)
+    exam.update_status()
+
+    student_exams = StudentExam.objects.filter(exam=exam)
+    pass_threshold = exam.exam_paper.total_score * 0.6
+
+    class_stats = {}
+    for class_obj in exam.classes.all():
+        # 获取班级的学生考试记录
+        class_exams = student_exams.filter(
+            student__userprofile__class_id=class_obj
+        )
+
+        # 已提交人数改为根据提交时间判断
+        submitted_exams = class_exams.filter(submitted_at__isnull=False)
+        submitted_count = submitted_exams.count()
+
+        # 已批改的试卷必须同时满足：已提交且有总分
+        graded_exams = submitted_exams.filter(total_score__isnull=False)
+        graded_count = graded_exams.count()
+
+        # 计算平均分和及格人数
+        stats = graded_exams.aggregate(
+            average=Avg('total_score'),
+            pass_count=Count(
+                'id',
+                filter=Q(total_score__gte=pass_threshold)
+            )
+        )
+
+        # 计算及格率
+        pass_rate = (
+            (stats['pass_count'] / graded_count * 100)
+            if graded_count > 0 else None
+        )
+
+        class_stats[class_obj] = {
+            'total': class_exams.count(),
+            'submitted': submitted_count,
+            'graded': graded_count,
+            'average': stats['average'],
+            'pass_rate': pass_rate
+        }
+
+    context = {
+        'exam': exam,
+        'class_stats': class_stats,
+        'student_exams': student_exams.select_related(
+            'student__userprofile',
+            'student__userprofile__class_id'
+        ).order_by(
+            'student__userprofile__class_id__name',
+            'student__username'
+        )
+    }
+    return render(request, 'teacher/exam_detail.html', context)
+
+
+@login_required
+def exam_start(request, pk):
+    """开始考试"""
+    exam = get_object_or_404(Exam, pk=pk, created_by=request.user)
+
+    if exam.status == 'preparing':
+        exam.status = 'in_progress'
+        exam.save()
+        messages.success(request, '考试已开始！')
+    else:
+        messages.error(request, '只有准备中的考试才能开始！')
+
+    return redirect('teacher:exam_detail', pk=pk)
+
+
+@login_required
+def exam_end(request, pk):
+    """结束考试"""
+    exam = get_object_or_404(Exam, pk=pk, created_by=request.user)
+
+    if exam.status == 'in_progress':
+        # 更新考试状态
+        exam.status = 'ended'
+        exam.end_time = timezone.now()
+        exam.save()
+
+        # 自动提交所有未交卷的试卷
+        unsubmitted_exams = StudentExam.objects.filter(
+            exam=exam,
+            status='in_progress'
+        )
+        for student_exam in unsubmitted_exams:
+            student_exam.submit()
+
+        messages.success(request, '考试已结束！所有未交卷的答卷已自动提交。')
+    else:
+        messages.error(request, '只有进行中的考试才能结束！')
+
+    return redirect('teacher:exam_detail', pk=pk)
+
+
+@login_required
+def exam_paper_questions(request, pk):
+    """管理试卷试题视图"""
+    exam_paper = get_object_or_404(ExamPaper, pk=pk, created_by=request.user)
+
+    # 检查试卷是否已被使用
+    if Exam.objects.filter(exam_paper=exam_paper).exists():
+        messages.warning(request, '此试卷已被使用，无法修改题目')
+        return redirect('teacher:exam_paper_preview', pk=pk)
+
+    if request.method == 'POST':
+        selected_question_ids = request.POST.getlist('questions')
+
+        try:
+            with transaction.atomic():
+                ExamQuestion.objects.filter(exam_paper=exam_paper).delete()
+
+                total_score = 0
+                for question_id in selected_question_ids:
+                    score = request.POST.get(f'score_{question_id}')
+                    if not score or int(score) <= 0:
+                        raise ValueError('试题分值必须大于0')
+
+                    ExamQuestion.objects.create(
+                        exam_paper=exam_paper,
+                        question_id=question_id,
+                        score=int(score)
+                    )
+                    total_score += int(score)
+
+                exam_paper.total_score = total_score
+                exam_paper.question_count = len(selected_question_ids)
+                exam_paper.save()
+
+                messages.success(request, '试题保存成功！')
+                return redirect('teacher:exam_paper_preview', pk=pk)
+
+        except Exception as e:
+            messages.error(request, f'保存失败：{str(e)}')
+
+    current_questions = exam_paper.examquestion_set.select_related('question')
+    available_questions = Question.objects.filter(
+        subject=exam_paper.subject,
+        created_by=request.user
+    ).exclude(id__in=current_questions.values_list('question_id', flat=True))
+
+    context = {
+        'exam_paper': exam_paper,
+        'current_questions': current_questions,
+        'available_questions': available_questions
+    }
+    return render(request, 'teacher/exam_paper_questions.html', context)
 
 
 @login_required
@@ -493,16 +747,16 @@ def class_delete(request, pk):
 @login_required
 def exam_list(request):
     """考试列表视图"""
-    # 获取当前教师的所有试卷及其状态
-    exams = ExamPaper.objects.filter(created_by=request.user).select_related('subject')
+    exams = Exam.objects.filter(created_by=request.user).select_related('exam_paper', 'exam_paper__subject')
 
     # 为每个考试统计参加人数和完成人数
     for exam in exams:
-        exam.participant_count = StudentExam.objects.filter(exam_paper=exam).count()
+        exam.participant_count = StudentExam.objects.filter(exam=exam).count()
         exam.completed_count = StudentExam.objects.filter(
-            exam_paper=exam,
-            submitted_at__isnull=False
+            exam=exam,
+            status='submitted'
         ).count()
+
         # 计算考试状态
         now = timezone.now()
         if exam.status == 'published':
@@ -523,47 +777,13 @@ def exam_list(request):
 
 
 @login_required
-def exam_detail(request, pk):
-    """考试详情视图"""
-    exam = get_object_or_404(ExamPaper, pk=pk, created_by=request.user)
-
-    # 获取考试的统计信息
-    student_exams = StudentExam.objects.filter(exam_paper=exam)
-    stats = {
-        'total_students': student_exams.count(),
-        'submitted_count': student_exams.filter(submitted_at__isnull=False).count(),
-        'average_score': student_exams.filter(total_score__isnull=False).aggregate(
-            Avg('total_score')
-        )['total_score__avg'],
-        'need_grading': student_exams.filter(
-            submitted_at__isnull=False,
-            total_score__isnull=True
-        ).count()
-    }
-
-    # 获取参加考试的学生列表
-    students = student_exams.select_related(
-        'student__userprofile',
-        'student__userprofile__class_id'
-    ).order_by('student__userprofile__class_id', 'student__username')
-
-    context = {
-        'exam': exam,
-        'stats': stats,
-        'students': students,
-        'now': timezone.now()
-    }
-    return render(request, 'teacher/exam_detail.html', context)
-
-
-@login_required
 def exam_grade(request, exam_id, student_id):
     """评分视图"""
     student_exam = get_object_or_404(
         StudentExam,
-        exam_paper_id=exam_id,
+        exam_id=exam_id,  # 使用 exam_id 而不是 exam_paper_id
         student_id=student_id,
-        exam_paper__created_by=request.user,
+        exam__created_by=request.user,  # 通过 exam 关联检查创建者
         status='submitted'  # 只能评阅已提交的试卷
     )
 
@@ -608,9 +828,6 @@ def exam_grade(request, exam_id, student_id):
         'answers': answers
     }
     return render(request, 'teacher/exam_grade.html', context)
-
-
-# teacher/views.py
 
 @login_required
 def exam_publish(request, pk):

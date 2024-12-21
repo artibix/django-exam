@@ -1,7 +1,8 @@
 # student/views.py
+from django.db.models import Avg
 from django.urls import reverse
 
-from teacher.models import StudentExam, StudentAnswer, Question
+from teacher.models import StudentExam, StudentAnswer, Question, Exam
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -21,25 +22,22 @@ def dashboard(request):
     # 获取当前进行中的考试
     current_exams = StudentExam.objects.filter(
         student=request.user,
-        exam_paper__status='published',
-        exam_paper__start_time__lte=timezone.now(),
-        exam_paper__end_time__gte=timezone.now(),
+        exam__status='in_progress',
         status='in_progress'
-    ).select_related('exam_paper', 'exam_paper__subject')
+    ).select_related('exam', 'exam__exam_paper', 'exam__exam_paper__subject')
 
     # 获取即将开始的考试
     upcoming_exams = StudentExam.objects.filter(
         student=request.user,
-        exam_paper__status='published',
-        exam_paper__start_time__gt=timezone.now(),
+        exam__status='preparing',
         status='in_progress'
-    ).select_related('exam_paper', 'exam_paper__subject')
+    ).select_related('exam', 'exam__exam_paper', 'exam__exam_paper__subject')
 
     # 获取已完成的考试
     completed_exams = StudentExam.objects.filter(
         student=request.user,
         status__in=['submitted', 'graded']
-    ).select_related('exam_paper', 'exam_paper__subject')
+    ).select_related('exam', 'exam__exam_paper', 'exam__exam_paper__subject')
 
     context = {
         'current_exams': current_exams,
@@ -52,38 +50,38 @@ def dashboard(request):
 @login_required
 def exam_detail(request, pk):
     """考试详情和答题界面"""
+    # 修改查询条件，确保获取正确的考试记录
     student_exam = get_object_or_404(
         StudentExam,
-        pk=pk,
         student=request.user,
-        exam_paper__status='published'
+        exam_id=pk
     )
-    exam_paper = student_exam.exam_paper
+    exam = student_exam.exam
 
-    # 检查考试时间
+    # 检查考试时间和状态
     now = timezone.now()
-    if now < exam_paper.start_time:
+    if now < exam.start_time:
         messages.error(request, '考试还未开始')
         return redirect('student:dashboard')
 
-    if now > exam_paper.end_time or student_exam.status != 'in_progress':
+    if now > exam.end_time or student_exam.status != 'in_progress':
         messages.error(request, '考试已结束')
         return redirect('student:dashboard')
 
-    # 计算剩余时间（以秒为单位）
-    end_time = min(exam_paper.end_time, exam_paper.start_time + timezone.timedelta(minutes=exam_paper.duration))
+    # 计算剩余时间
+    end_time = min(exam.end_time, exam.start_time + timezone.timedelta(minutes=exam.duration))
     remaining_seconds = int((end_time - now).total_seconds())
-
-    # 如果剩余时间小于0，设置为0
     remaining_seconds = max(remaining_seconds, 0)
+
+    # 获取试题和答案
+    exam_questions = exam.exam_paper.examquestion_set.select_related('question').all()
+    student_answers = StudentAnswer.objects.filter(student_exam=student_exam)
+    answers_dict = {answer.question_id: answer.answer_text for answer in student_answers}
 
     context = {
         'student_exam': student_exam,
-        'exam_questions': exam_paper.examquestion_set.select_related('question').all(),
-        'student_answers': {
-            answer.question_id: answer.answer_text
-            for answer in StudentAnswer.objects.filter(student_exam=student_exam)
-        },
+        'exam_questions': exam_questions,
+        'student_answers': answers_dict,
         'remaining_seconds': remaining_seconds
     }
     return render(request, 'student/exam_detail.html', context)
@@ -96,31 +94,59 @@ def exam_start(request, pk):
         StudentExam,
         pk=pk,
         student=request.user,
-        exam_paper__status='published',
+        exam__status='in_progress',
         status='in_progress'
     )
 
     # 检查考试时间
     now = timezone.now()
-    if now < student_exam.exam_paper.start_time:
+    if now < student_exam.exam.start_time:
         messages.error(request, '考试还未开始')
         return redirect('student:dashboard')
 
-    if now > student_exam.exam_paper.end_time:
+    if now > student_exam.exam.end_time:
         messages.error(request, '考试已结束')
         return redirect('student:dashboard')
 
     # 初始化答题记录
-    questions = student_exam.exam_paper.questions.all()
+    questions = student_exam.exam.exam_paper.examquestion_set.all()
     with transaction.atomic():
-        for question in questions:
+        for exam_question in questions:
             StudentAnswer.objects.get_or_create(
                 student_exam=student_exam,
-                question=question,
+                question=exam_question.question,
                 defaults={'answer_text': ''}
             )
 
     return redirect('student:exam_detail', pk=pk)
+
+
+@login_required
+def exam_auto_submit(request, pk):
+    """考试时间结束自动提交"""
+    student_exam = get_object_or_404(
+        StudentExam,
+        pk=pk,
+        student=request.user,
+        status='in_progress'
+    )
+
+    if timezone.now() >= student_exam.exam.end_time:
+        with transaction.atomic():
+            student_exam.status = 'submitted'
+            student_exam.submitted_at = timezone.now()
+            student_exam.save()
+
+            # 对客观题进行自动评分
+            auto_grade_answers(student_exam)
+
+        return JsonResponse({
+            'status': 'success',
+            'message': '考试已自动提交',
+            'redirect_url': reverse('student:dashboard')
+        })
+
+    return JsonResponse({'status': 'error', 'message': '考试尚未结束'})
 
 
 @login_required
@@ -185,34 +211,6 @@ def exam_submit(request, pk):
 
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)})
-
-
-@login_required
-def exam_auto_submit(request, pk):
-    """考试时间结束自动提交"""
-    student_exam = get_object_or_404(
-        StudentExam,
-        pk=pk,
-        student=request.user,
-        status='in_progress'
-    )
-
-    if timezone.now() >= student_exam.exam_paper.end_time:
-        with transaction.atomic():
-            student_exam.status = 'submitted'
-            student_exam.submitted_at = timezone.now()
-            student_exam.save()
-
-            # 对客观题进行自动评分
-            auto_grade_answers(student_exam)
-
-        return JsonResponse({
-            'status': 'success',
-            'message': '考试已自动提交',
-            'redirect_url': reverse('student:dashboard')
-        })
-
-    return JsonResponse({'status': 'error', 'message': '考试尚未结束'})
 
 
 def auto_grade_answers(student_exam):

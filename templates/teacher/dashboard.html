@@ -1,13 +1,11 @@
-<!-- templates/teacher/dashboard.html -->
-
 {% extends 'teacher/base.html' %}
 
 {% block content %}
     <div class="container mt-4">
         <div class="row mb-4">
             <div class="col-md-12">
-                <h2>欢迎回来，{{ request.user.get_full_name }}</h2>
-                <p class="lead text-muted">教师系统仪表板</p>
+                <h2>欢迎回来,{{ request.user.get_full_name }}</h2>
+                <p class="lead text-muted">教师仪表板</p>
             </div>
         </div>
 
@@ -25,12 +23,6 @@
                             <div>
                                 <a href="{% url 'teacher:exam_paper_list' %}" class="btn btn-primary">管理试卷</a>
                             </div>
-                        </div>
-                        <hr>
-                        <div class="small">
-                            <div>草稿：{{ draft_papers_count }}</div>
-                            <div>已发布：{{ published_papers_count }}</div>
-                            <div>已结束：{{ ended_papers_count }}</div>
                         </div>
                     </div>
                 </div>
@@ -50,9 +42,8 @@
                                 <a href="{% url 'teacher:class_list' %}" class="btn btn-success">查看班级</a>
                             </div>
                         </div>
-                        <hr>
                         <div class="small">
-                            <div>总学生数：{{ students_count }}</div>
+                            <div>总学生数:{{ students_count }}</div>
                         </div>
                     </div>
                 </div>
@@ -72,9 +63,8 @@
                                 <a href="{% url 'teacher:exam_list' %}" class="btn btn-info text-white">查看考试</a>
                             </div>
                         </div>
-                        <hr>
                         <div class="small">
-                            <div>待批改：{{ pending_grading_count }}</div>
+                            <div>待批改:{{ pending_grading_count }}</div>
                         </div>
                     </div>
                 </div>
@@ -96,7 +86,6 @@
                                 <tr>
                                     <th>试卷名称</th>
                                     <th>科目</th>
-                                    <th>状态</th>
                                     <th>创建时间</th>
                                     <th>操作</th>
                                 </tr>
@@ -106,11 +95,6 @@
                                     <tr>
                                         <td>{{ paper.name }}</td>
                                         <td>{{ paper.subject.name }}</td>
-                                        <td>
-                                        <span class="badge bg-{{ paper.status|yesno:'success,secondary' }}">
-                                            {{ paper.get_status_display }}
-                                        </span>
-                                        </td>
                                         <td>{{ paper.created_at|date:"Y-m-d H:i" }}</td>
                                         <td>
                                             <a href="{% url 'teacher:exam_paper_preview' paper.id %}" class="btn btn-sm btn-outline-primary">
@@ -120,7 +104,7 @@
                                     </tr>
                                 {% empty %}
                                     <tr>
-                                        <td colspan="5" class="text-center">暂无试卷</td>
+                                        <td colspan="4" class="text-center">暂无试卷</td>
                                     </tr>
                                 {% endfor %}
                                 </tbody>

@@ -2,8 +2,10 @@
 
 from django import forms
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
-from teacher.models import ExamPaper, Question, Subject, TeacherClass
+from teacher.models import ExamPaper, Question, Subject, TeacherClass, Exam
+from users.models import Class
 
 
 class TeacherLoginForm(forms.Form):
@@ -25,19 +27,38 @@ class TeacherLoginForm(forms.Form):
 
 class ExamPaperForm(forms.ModelForm):
     """试卷基本信息表单"""
+    is_template = forms.BooleanField(
+        label='保存为模板',
+        required=False,
+        help_text='设为模板后可重复使用'
+    )
 
     class Meta:
         model = ExamPaper
-        fields = ['name', 'subject', 'total_score', 'duration', 'start_time', 'end_time']
+        fields = ['name', 'subject', 'is_template']
         widgets = {
             'name': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': '请输入试卷名称'
             }),
             'subject': forms.Select(attrs={'class': 'form-control'}),
-            'total_score': forms.NumberInput(attrs={
+        }
+
+
+class ExamForm(forms.ModelForm):
+    """考试基本信息表单"""
+
+    class Meta:
+        model = Exam
+        fields = ['name', 'exam_paper', 'duration', 'start_time',
+                  'end_time', 'description']
+        widgets = {
+            'name': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': '请输入总分'
+                'placeholder': '请输入考试名称'
+            }),
+            'exam_paper': forms.Select(attrs={
+                'class': 'form-control'
             }),
             'duration': forms.NumberInput(attrs={
                 'class': 'form-control',
@@ -50,26 +71,37 @@ class ExamPaperForm(forms.ModelForm):
             'end_time': forms.DateTimeInput(attrs={
                 'class': 'form-control',
                 'type': 'datetime-local'
+            }),
+            'description': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 4,
+                'placeholder': '请输入考试说明（可选）'
             })
         }
-        labels = {
-            'name': '试卷名称',
-            'subject': '科目',
-            'total_score': '总分',
-            'duration': '考试时长',
-            'start_time': '开始时间',
-            'end_time': '结束时间'
-        }
 
-    def clean(self):
-        cleaned_data = super().clean()
-        start_time = cleaned_data.get('start_time')
-        end_time = cleaned_data.get('end_time')
+    def __init__(self, teacher, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['exam_paper'].queryset = ExamPaper.objects.filter(
+            created_by=teacher
+        )
 
-        if start_time and end_time and start_time >= end_time:
-            raise ValidationError('结束时间必须晚于开始时间')
 
-        return cleaned_data
+class ExamClassesForm(forms.Form):
+    """考试班级选择表单"""
+    classes = forms.ModelMultipleChoiceField(
+        queryset=None,
+        widget=forms.CheckboxSelectMultiple,
+        required=True,
+        label='参与班级'
+    )
+
+    def __init__(self, teacher, exam_paper, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if exam_paper:
+            self.fields['classes'].queryset = Class.objects.filter(
+                teacher_classes__teacher=teacher,
+                teacher_classes__subject=exam_paper.subject
+            ).distinct()
 
 
 class QuestionSelectionForm(forms.Form):
