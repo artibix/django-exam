@@ -48,11 +48,6 @@ def teacher_dashboard(request):
     exam_papers = ExamPaper.objects.filter(created_by=request.user)
     exam_papers_count = exam_papers.count()
 
-    # 在数据模型中没有定义试卷的状态字段,因此不能按状态过滤
-    # draft_papers_count = exam_papers.filter(status='draft').count()
-    # published_papers_count = exam_papers.filter(status='published').count()
-    # ended_papers_count = exam_papers.filter(status='ended').count()
-
     # 获取最近的试卷
     recent_papers = exam_papers.select_related('subject').order_by('-created_at')[:5]
 
@@ -69,24 +64,21 @@ def teacher_dashboard(request):
 
     # 获取考试统计
     now = timezone.now()
-    ongoing_exams_count = Exam.objects.filter(  # 使用 Exam 模型
+    ongoing_exams_count = Exam.objects.filter(
         exam_paper__created_by=request.user,
         start_time__lte=now,
         end_time__gte=now,
-        status='in_progress'  # 使用 Exam 模型的 status 字段
+        status='in_progress'
     ).count()
 
     # 获取待批改试卷数量
     pending_grading_count = StudentExam.objects.filter(
-        exam__exam_paper__created_by=request.user,  # 通过 exam 关联 ExamPaper
-        status='submitted'  # 使用 StudentExam 模型的 status 字段
+        exam__exam_paper__created_by=request.user,
+        status='submitted'
     ).count()
 
     context = {
         'exam_papers_count': exam_papers_count,
-        # 'draft_papers_count': draft_papers_count,
-        # 'published_papers_count': published_papers_count,
-        # 'ended_papers_count': ended_papers_count,
         'classes_count': classes_count,
         'students_count': students_count,
         'ongoing_exams_count': ongoing_exams_count,
@@ -100,15 +92,12 @@ def teacher_dashboard(request):
 @login_required
 def exam_paper_list(request):
     """试卷列表视图"""
-    exam_papers = ExamPaper.objects.filter(created_by=request.user).select_related('subject')
-
-    # 按模板和普通试卷分类
-    template_papers = exam_papers.filter(is_template=True)
-    normal_papers = exam_papers.filter(is_template=False)
+    exam_papers = ExamPaper.objects.filter(
+        created_by=request.user
+    ).select_related('subject')
 
     context = {
-        'template_papers': template_papers,
-        'normal_papers': normal_papers
+        'exam_papers': exam_papers,
     }
     return render(request, 'teacher/exam_paper_list.html', context)
 
@@ -116,13 +105,6 @@ def exam_paper_list(request):
 @login_required
 def exam_paper_create(request):
     """创建试卷视图"""
-    # 支持从模板创建
-    template_id = request.GET.get('template_id')
-    template = None
-
-    if template_id:
-        template = get_object_or_404(ExamPaper, pk=template_id, created_by=request.user, is_template=True)
-
     if request.method == 'POST':
         form = ExamPaperForm(request.POST)
         if form.is_valid():
@@ -130,33 +112,14 @@ def exam_paper_create(request):
             exam_paper.created_by = request.user
             exam_paper.save()
 
-            # 如果是从模板创建，复制试题
-            if template:
-                for eq in template.examquestion_set.all():
-                    ExamQuestion.objects.create(
-                        exam_paper=exam_paper,
-                        question=eq.question,
-                        score=eq.score
-                    )
-                exam_paper.total_score = template.total_score
-                exam_paper.question_count = template.question_count
-                exam_paper.save()
-
             messages.success(request, '试卷创建成功')
             return redirect('teacher:exam_paper_questions', pk=exam_paper.pk)
     else:
-        initial = {}
-        if template:
-            initial = {
-                'name': f'{template.name} - 副本',
-                'subject': template.subject,
-            }
-        form = ExamPaperForm(initial=initial)
+        form = ExamPaperForm()
 
     context = {
         'form': form,
         'title': '创建试卷',
-        'template': template
     }
     return render(request, 'teacher/exam_paper_form.html', context)
 
@@ -828,6 +791,7 @@ def exam_grade(request, exam_id, student_id):
         'answers': answers
     }
     return render(request, 'teacher/exam_grade.html', context)
+
 
 @login_required
 def exam_publish(request, pk):

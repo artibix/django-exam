@@ -27,15 +27,9 @@ class TeacherLoginForm(forms.Form):
 
 class ExamPaperForm(forms.ModelForm):
     """试卷基本信息表单"""
-    is_template = forms.BooleanField(
-        label='保存为模板',
-        required=False,
-        help_text='设为模板后可重复使用'
-    )
-
     class Meta:
         model = ExamPaper
-        fields = ['name', 'subject', 'is_template']
+        fields = ['name', 'subject']
         widgets = {
             'name': forms.TextInput(attrs={
                 'class': 'form-control',

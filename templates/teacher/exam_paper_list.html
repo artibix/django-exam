@@ -1,4 +1,3 @@
-<!-- templates/teacher/exam_paper_list.html -->
 {% extends 'teacher/base.html' %}
 
 {% block content %}
@@ -20,55 +19,6 @@
             {% endfor %}
         {% endif %}
 
-        <!-- 模板试卷 -->
-        <div class="card mb-4">
-            <div class="card-header bg-light">
-                <h5 class="card-title mb-0">试卷模板</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
-                        <tr>
-                            <th>试卷名称</th>
-                            <th>科目</th>
-                            <th>题目数量</th>
-                            <th>总分</th>
-                            <th>创建时间</th>
-                            <th>操作</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for paper in template_papers %}
-                            <tr>
-                                <td>{{ paper.name }}</td>
-                                <td>{{ paper.subject.name }}</td>
-                                <td>{{ paper.question_count }}</td>
-                                <td>{{ paper.total_score }}</td>
-                                <td>{{ paper.created_at|date:"Y-m-d H:i" }}</td>
-                                <td>
-                                    <div class="btn-group">
-                                        <a href="{% url 'teacher:exam_paper_create' %}?template_id={{ paper.id }}"
-                                           class="btn btn-sm btn-success">使用模板</a>
-                                        <a href="{% url 'teacher:exam_paper_preview' paper.id %}"
-                                           class="btn btn-sm btn-outline-info">预览</a>
-                                        <a href="{% url 'teacher:exam_paper_questions' paper.id %}"
-                                           class="btn btn-sm btn-outline-primary">编辑试题</a>
-                                    </div>
-                                </td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="6" class="text-center">暂无试卷模板</td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- 普通试卷 -->
         <div class="card">
             <div class="card-header bg-light">
                 <h5 class="card-title mb-0">试卷列表</h5>
@@ -88,7 +38,7 @@
                         </tr>
                         </thead>
                         <tbody>
-                        {% for paper in normal_papers %}
+                        {% for paper in exam_papers %}
                             <tr>
                                 <td>{{ paper.name }}</td>
                                 <td>{{ paper.subject.name }}</td>

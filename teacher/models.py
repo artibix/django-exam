@@ -114,10 +114,6 @@ class ExamPaper(models.Model):
         related_name='created_exam_papers',
         verbose_name='创建人'
     )
-    is_template = models.BooleanField(
-        default=False,
-        verbose_name='是否为模板'
-    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
 
