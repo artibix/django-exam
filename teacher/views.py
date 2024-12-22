@@ -1,13 +1,15 @@
+import statistics
+from collections import defaultdict
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Model, Max, Min, StdDev, F
 from django.http import JsonResponse
 from django.urls import reverse_lazy
 from django.utils import timezone
-from django.views.generic import CreateView, ListView
+from django.views.generic import CreateView, ListView, TemplateView
 
 from users.models import Class, UserProfile
 from .forms import TeacherLoginForm, QuestionForm, TeacherClassForm, SubjectForm, ExamForm, ExamClassesForm, \
@@ -15,10 +17,11 @@ from .forms import TeacherLoginForm, QuestionForm, TeacherClassForm, SubjectForm
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from .forms import ExamPaperForm, QuestionSelectionForm
+from .forms import ExamPaperForm
 from teacher.models import ExamPaper, ExamQuestion, TeacherClass, Question, Subject, StudentExam, StudentAnswer, Exam, \
     Announcement
 from django.db.models import Count, Avg
+import numpy as np
 
 
 def teacher_login(request):
@@ -990,3 +993,276 @@ def mark_announcement_as_read(request, pk):
     announcement.is_read = True
     announcement.save()
     return JsonResponse({'status': 'success'})
+
+
+class GradeAnalysisView(LoginRequiredMixin, TemplateView):
+    """成绩分析视图"""
+
+    def get_template_names(self):
+        """根据用户角色返回对应的模板"""
+        if hasattr(self.request.user, 'userprofile') and self.request.user.userprofile.role == 'admin':
+            return ['admin_site/grade_analysis.html']
+        return ['teacher/grade_analysis.html']
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        profile = user.userprofile
+
+        # 获取有权限查看的考试列表
+        if profile.role == 'admin':
+            exams = Exam.objects.filter(status='ended')
+        else:
+            teacher_classes = TeacherClass.objects.filter(teacher=user)
+            exams = Exam.objects.filter(
+                status='ended',
+                classes__in=teacher_classes.values('class_id')
+            ).distinct()
+
+        exam_id = self.request.GET.get('exam_id')
+        if exam_id:
+            exam = get_object_or_404(exams.select_related('exam_paper'), pk=exam_id)
+            analysis_data = self.analyze_exam_grades(exam)
+
+            context.update({
+                'exam': exam,
+                'analysis_results': analysis_data['class_analysis'],
+                'overall_stats': analysis_data['overall_stats'],
+                'chart_data': analysis_data['chart_data'],
+                'question_analysis': analysis_data['question_analysis']
+            })
+
+        context['exams'] = exams
+        return context
+
+    def analyze_exam_grades(self, exam):
+        """分析考试成绩，包括班级分析、总体统计和题目分析"""
+        total_score = exam.exam_paper.total_score
+        passing_percentage = 0.6  # 及格线为60%
+
+        class_analysis = {}
+        overall_data = {
+            'total_students': 0,
+            'total_passing': 0,
+            'scores_sum': 0,
+            'all_scores': []
+        }
+
+        # 初始化图表数据结构
+        chart_data = {
+            'score_distribution': {
+                '0-30%': 0, '30-45%': 0, '45-60%': 0,
+                '60-70%': 0, '70-80%': 0, '80-90%': 0, '90-100%': 0
+            },
+            'class_comparison': [],
+            'time_analysis': [],
+            'objective_subjective_comparison': [],
+            'score_segments': []
+        }
+
+        # 分析每个班级的成绩
+        for class_obj in exam.classes.all():
+            class_exams = StudentExam.objects.filter(
+                exam=exam,
+                student__userprofile__class_id=class_obj,
+                status='graded'
+            ).select_related('student__userprofile')
+
+            # 基础统计数据
+            stats = class_exams.aggregate(
+                avg_score=Avg('total_score'),
+                max_score=Max('total_score'),
+                min_score=Min('total_score'),
+                std_dev=StdDev('total_score'),
+                total_count=Count('id'),
+                passing_count=Count(
+                    'id',
+                    filter=Q(total_score__gte=F('exam__exam_paper__total_score') * 0.6)
+                )
+            )
+
+            # 处理空值
+            stats['avg_score'] = stats['avg_score'] or 0
+            stats['max_score'] = stats['max_score'] or 0
+            stats['min_score'] = stats['min_score'] or 0
+            stats['std_dev'] = stats['std_dev'] or 0
+            stats['total_count'] = stats['total_count'] or 0
+            stats['passing_count'] = stats['passing_count'] or 0
+
+            # 收集详细数据用于分析
+            score_data = []
+            time_data = []
+            class_distribution = {
+                '0-30%': 0, '30-45%': 0, '45-60%': 0,
+                '60-70%': 0, '70-80%': 0, '80-90%': 0, '90-100%': 0
+            }
+
+            for student_exam in class_exams:
+                if student_exam.total_score is not None:
+                    score_percentage = (student_exam.total_score / total_score) * 100
+                    score_data.append(score_percentage)
+
+                    # 更新分数分布
+                    if score_percentage < 30:
+                        class_distribution['0-30%'] += 1
+                    elif score_percentage < 45:
+                        class_distribution['30-45%'] += 1
+                    elif score_percentage < 60:
+                        class_distribution['45-60%'] += 1
+                    elif score_percentage < 70:
+                        class_distribution['60-70%'] += 1
+                    elif score_percentage < 80:
+                        class_distribution['70-80%'] += 1
+                    elif score_percentage < 90:
+                        class_distribution['80-90%'] += 1
+                    else:
+                        class_distribution['90-100%'] += 1
+
+                    # 统计答题用时
+                    if student_exam.submitted_at:
+                        duration = (student_exam.submitted_at -
+                                    student_exam.started_at).total_seconds() / 60
+                        time_data.append(duration)
+
+            # 计算客观题和主观题的平均得分率
+            objective_scores = []
+            subjective_scores = []
+
+            answers = StudentAnswer.objects.filter(
+                student_exam__exam=exam,
+                student_exam__student__userprofile__class_id=class_obj
+            ).select_related('question')
+
+            for answer in answers:
+                if answer.score is not None and answer.question.score:
+                    score_percentage = (answer.score / answer.question.score) * 100
+                    if answer.question.is_objective():
+                        objective_scores.append(score_percentage)
+                    else:
+                        subjective_scores.append(score_percentage)
+
+            # 更新总体分布数据
+            for key in chart_data['score_distribution']:
+                chart_data['score_distribution'][key] += class_distribution[key]
+
+            # 更新班级数据
+            class_analysis[class_obj] = {
+                'stats': stats,
+                'distribution': class_distribution,
+                'score_data': score_data,
+                'time_data': time_data,
+                'performance_analysis': {
+                    'objective_avg': (sum(objective_scores) / len(objective_scores)
+                                      if objective_scores else 0),
+                    'subjective_avg': (sum(subjective_scores) / len(subjective_scores)
+                                       if subjective_scores else 0)
+                }
+            }
+
+            # 更新总体统计
+            overall_data['total_students'] += stats['total_count']
+            overall_data['total_passing'] += stats['passing_count']
+            overall_data['scores_sum'] += stats['avg_score'] * stats['total_count']
+            overall_data['all_scores'].extend(score_data)
+
+            # 添加班级比较数据
+            chart_data['class_comparison'].append({
+                'class': class_obj.name,
+                'average': float(stats['avg_score'] / total_score * 100),
+                'passing_rate': float(stats['passing_count'] / stats['total_count'] * 100
+                                      if stats['total_count'] > 0 else 0),
+                'std_dev': float(stats['std_dev'] / total_score * 100 if stats['std_dev'] else 0)
+            })
+
+        # 计算总体统计指标
+        if overall_data['all_scores']:
+            score_range = max(overall_data['all_scores']) - min(overall_data['all_scores'])
+            all_scores_sorted = sorted(overall_data['all_scores'])
+            median_score = statistics.median(all_scores_sorted)
+            try:
+                mode_score = statistics.mode(all_scores_sorted)
+            except statistics.StatisticsError:
+                mode_score = median_score
+        else:
+            score_range = 0
+            median_score = 0
+            mode_score = 0
+
+        overall_stats = {
+            'total_students': overall_data['total_students'],
+            'average_score': (overall_data['scores_sum'] / overall_data['total_students'] /
+                              total_score * 100 if overall_data['total_students'] > 0 else 0),
+            'median_score': median_score,
+            'mode_score': mode_score,
+            'overall_passing_rate': (overall_data['total_passing'] / overall_data['total_students'] * 100
+                                     if overall_data['total_students'] > 0 else 0),
+            'score_range': score_range
+        }
+
+        # Generate question analysis
+        question_analysis = self.analyze_questions(exam)
+
+        # Format question data for charts
+        question_chart_data = {
+            'questions': [],
+            'scoring_rates': [],
+            'difficulty_rates': []
+        }
+
+        for id, data in question_analysis.items():
+            question_chart_data['questions'].append(f'第{id}题')
+            question_chart_data['scoring_rates'].append(float(data['scoring_rate']))
+            question_chart_data['difficulty_rates'].append(100 - float(data['scoring_rate']))
+
+        chart_data['question_analysis'] = question_chart_data
+
+        return {
+            'class_analysis': class_analysis,
+            'overall_stats': overall_stats,
+            'chart_data': chart_data,
+            'question_analysis': question_analysis
+        }
+
+    def analyze_questions(self, exam):
+        """分析试题数据"""
+        questions = exam.exam_paper.examquestion_set.select_related('question')
+        question_stats = {}
+
+        for exam_question in questions:
+            question = exam_question.question
+            answers = StudentAnswer.objects.filter(
+                student_exam__exam=exam,
+                question=question,
+                score__isnull=False
+            )
+
+            stats = answers.aggregate(
+                avg_score=Avg('score'),
+                max_score=Max('score'),
+                min_score=Min('score'),
+                total_answers=Count('id')
+            )
+
+            # 计算得分率
+            scoring_rate = stats['avg_score'] / question.score * 100 if stats['avg_score'] else 0
+
+            question_stats[question.id] = {
+                'content': question.content[:100],
+                'type': question.get_type_display(),
+                'score': question.score,
+                'avg_score': stats['avg_score'],
+                'scoring_rate': scoring_rate,
+                'difficulty_level': self.calculate_difficulty_level(scoring_rate)
+            }
+
+        return question_stats
+
+    @staticmethod
+    def calculate_difficulty_level(scoring_rate):
+        """根据得分率计算难度级别"""
+        if scoring_rate >= 85:
+            return '简单'
+        elif scoring_rate >= 60:
+            return '中等'
+        else:
+            return '困难'

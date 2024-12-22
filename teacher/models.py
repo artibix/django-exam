@@ -423,3 +423,54 @@ class Announcement(models.Model):
 
     def __str__(self):
         return self.title
+
+    # teacher/models.py
+
+
+class GradeAnalysis(models.Model):
+    """成绩分析模型"""
+    exam = models.ForeignKey(
+        Exam,
+        on_delete=models.CASCADE,
+        related_name='grade_analyses',
+        verbose_name='考试'
+    )
+    class_id = models.ForeignKey(
+        'users.Class',
+        on_delete=models.CASCADE,
+        verbose_name='班级'
+    )
+    total_students = models.IntegerField(verbose_name='总人数')
+    average_score = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        verbose_name='平均分'
+    )
+    highest_score = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        verbose_name='最高分'
+    )
+    lowest_score = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        verbose_name='最低分'
+    )
+    passing_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        verbose_name='及格率'
+    )
+    score_distribution = models.JSONField(
+        verbose_name='分数分布',
+        help_text='格式：{"0-60": 10, "60-70": 20, ...}'
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='创建时间'
+    )
+
+    class Meta:
+        verbose_name = '成绩分析'
+        verbose_name_plural = '成绩分析'
+        ordering = ['-created_at']

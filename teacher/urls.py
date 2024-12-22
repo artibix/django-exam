@@ -45,4 +45,6 @@ urlpatterns = [
     path('announcements/', views.AnnouncementListView.as_view(), name='announcement_list'),
     path('announcements/create/', views.AnnouncementCreateView.as_view(), name='announcement_create'),
     path('announcements/<int:pk>/read/', views.mark_announcement_as_read, name='mark_announcement_read'),
+    # 成绩分析
+    path('grade-analysis/', views.GradeAnalysisView.as_view(), name='grade_analysis'),
 ]

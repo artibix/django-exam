@@ -1,0 +1,512 @@
+<div class="container-fluid mt-4">
+    <!-- 考试选择表单 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label for="exam_select" class="form-label">选择考试</label>
+                    <select name="exam_id" id="exam_select" class="form-select" required>
+                        <option value="">请选择考试...</option>
+                        {% for exam_item in exams %}
+                            <option value="{{ exam_item.id }}"
+                                    {% if exam and exam.id == exam_item.id %}selected{% endif %}>
+                                {{ exam_item.name }} ({{ exam_item.exam_paper.subject.name }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-chart-bar me-2"></i>分析
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if exam %}
+        <!-- 总体统计卡片组 -->
+        <div class="row mb-4">
+            <div class="col-md-2">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted mb-2">总人数</h6>
+                        <h3>{{ overall_stats.total_students }}</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted mb-2">平均分</h6>
+                        <h3>{{ overall_stats.average_score|floatformat:1 }}%</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted mb-2">中位数</h6>
+                        <h3>{{ overall_stats.median_score|floatformat:1 }}%</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted mb-2">众数</h6>
+                        <h3>{{ overall_stats.mode_score|floatformat:1 }}%</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted mb-2">及格率</h6>
+                        <h3>{{ overall_stats.overall_passing_rate|floatformat:1 }}%</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted mb-2">分数跨度</h6>
+                        <h3>{{ overall_stats.score_range|floatformat:1 }}%</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主要图表区域 -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">班级成绩对比</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="classComparison" style="height: 400px;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">总体分数分布</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="scoreDistribution" style="height: 400px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 题型分析区域 -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">题型得分分析</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="questionTypeAnalysis" style="height: 400px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 各班级详细分析 -->
+        {% for class, result in analysis_results.items %}
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">{{ class.name }} - 详细分析</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- 基础统计信息 -->
+                        <div class="col-md-4">
+                            <h6 class="mb-3">基础统计</h6>
+                            <table class="table table-sm">
+                                <tbody>
+                                <tr>
+                                    <th>总人数：</th>
+                                    <td>{{ result.stats.total_count }}人</td>
+                                </tr>
+                                <tr>
+                                    <th>平均分：</th>
+                                    <td>
+                                        {% if result.stats.avg_score %}
+                                            {% widthratio result.stats.avg_score exam.exam_paper.total_score 100 %}%
+                                        {% else %}
+                                            0%
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>最高分：</th>
+                                    <td>
+                                        {% if result.stats.max_score %}
+                                            {% widthratio result.stats.max_score exam.exam_paper.total_score 100 %}%
+                                        {% else %}
+                                            0%
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>最低分：</th>
+                                    <td>
+                                        {% if result.stats.min_score %}
+                                            {% widthratio result.stats.min_score exam.exam_paper.total_score 100 %}%
+                                        {% else %}
+                                            0%
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>标准差：</th>
+                                    <td>
+                                        {% if result.stats.std_dev %}
+                                            {% widthratio result.stats.std_dev exam.exam_paper.total_score 100 %}%
+                                        {% else %}
+                                            0%
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>及格率：</th>
+                                    <td>
+                                        {% if result.stats.total_count %}
+                                            {% widthratio result.stats.passing_count result.stats.total_count 100 %}%
+                                        {% else %}
+                                            0%
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- 分数分布 -->
+                        <div class="col-md-8">
+                            <h6 class="mb-3">分数分布</h6>
+                            {% for range, count in result.distribution.items %}
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span>{{ range }} ({{ count }}人)</span>
+                                        <span>{% widthratio count result.stats.total_count 100 %}%</span>
+                                    </div>
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar {% if '90-100' in range %}bg-success
+                                {% elif '80-90' in range %}bg-info
+                                {% elif '70-80' in range %}bg-primary
+                                {% elif '60-70' in range %}bg-warning
+                                {% else %}bg-danger{% endif %}"
+                                             role="progressbar"
+                                             style="width: {% widthratio count result.stats.total_count 100 %}%">
+                                            {{ count }}人
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+
+        <!-- 题目分析表格 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">试题分析</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                        <tr>
+                            <th>题号</th>
+                            <th>题型</th>
+                            <th>内容</th>
+                            <th>分值</th>
+                            <th>平均得分</th>
+                            <th>得分率</th>
+                            <th>难度</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for id, question in question_analysis.items %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td>{{ question.type }}</td>
+                                <td>{{ question.content }}</td>
+                                <td>{{ question.score }}</td>
+                                <td>{{ question.avg_score|floatformat:1 }}</td>
+                                <td>{{ question.scoring_rate|floatformat:1 }}%</td>
+                                <td>
+                                <span class="badge {% if question.difficulty_level == '简单' %}bg-success
+                                    {% elif question.difficulty_level == '中等' %}bg-warning
+                                    {% else %}bg-danger{% endif %}">
+                                    {{ question.difficulty_level }}
+                                </span>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+{% if exam %}
+    <script>
+        // ECharts图表配置和渲染
+        document.addEventListener('DOMContentLoaded', function () {
+            // 班级对比图
+            const classComparisonChart = echarts.init(document.getElementById('classComparison'));
+            const classComparisonOption = {
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'shadow'
+                    }
+                },
+                legend: {
+                    data: ['平均分', '及格率', '标准差']
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: {{ chart_data.class_comparison|safe|stringformat:"s" }}.map(item => item.class)
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '百分比',
+                    axisLabel: {
+                        formatter: '{value}%'
+                    }
+                },
+                series: [
+                    {
+                        name: '平均分',
+                        type: 'bar',
+                        data: {{ chart_data.class_comparison|safe|stringformat:"s" }}.map(item => item.average)
+                    },
+                    {
+                        name: '及格率',
+                        type: 'line',
+                        data: {{ chart_data.class_comparison|safe|stringformat:"s" }}.map(item => item.passing_rate)
+                    },
+                    {
+                        name: '标准差',
+                        type: 'line',
+                        lineStyle: {
+                            type: 'dashed'
+                        },
+                        data: {{ chart_data.class_comparison|safe|stringformat:"s" }}.map(item => item.std_dev)
+                    }
+                ]
+            };
+            classComparisonChart.setOption(classComparisonOption);
+
+            // 分数分布图
+            const scoreDistributionChart = echarts.init(document.getElementById('scoreDistribution'));
+            const scoreDistributionOption = {
+                tooltip: {
+                    trigger: 'item',
+                    formatter: '{b}: {c}人 ({d}%)'
+                },
+                legend: {
+                    orient: 'vertical',
+                    left: 'left',
+                },
+                series: [
+                    {
+                        type: 'pie',
+                        radius: ['40%', '70%'],
+                        avoidLabelOverlap: false,
+                        itemStyle: {
+                            borderRadius: 10,
+                            borderColor: '#fff',
+                            borderWidth: 2
+                        },
+                        label: {
+                            show: false,
+                            position: 'center'
+                        },
+                        emphasis: {
+                            label: {
+                                show: true,
+                                fontSize: '20',
+                                fontWeight: 'bold'
+                            }
+                        },
+                        labelLine: {
+                            show: false
+                        },
+                        data: [
+                            {value: {{ chart_data.score_distribution|safe }}['0-30%'] || 0, name: '0-30%'},
+                            {value: {{ chart_data.score_distribution|safe }}['30-45%'] || 0, name: '30-45%'},
+                            {value: {{ chart_data.score_distribution|safe }}['45-60%'] || 0, name: '45-60%'},
+                            {value: {{ chart_data.score_distribution|safe }}['60-70%'] || 0, name: '60-70%'},
+                            {value: {{ chart_data.score_distribution|safe }}['70-80%'] || 0, name: '70-80%'},
+                            {value: {{ chart_data.score_distribution|safe }}['80-90%'] || 0, name: '80-90%'},
+                            {value: {{ chart_data.score_distribution|safe }}['90-100%'] || 0, name: '90-100%'}
+                        ]
+                    }
+                ]
+            };
+            scoreDistributionChart.setOption(scoreDistributionOption);
+
+            // 题型分析图
+            const questionTypeChart = echarts.init(document.getElementById('questionTypeAnalysis'));
+            const questionChartData = {{ chart_data.question_analysis|safe }};
+            const questionTypeOption = {
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'shadow'
+                    }
+                },
+                legend: {
+                    data: ['得分率', '难度系数']
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    containLabel: true
+                },
+                xAxis: [
+                    {
+                        type: 'category',
+                        data: questionChartData.questions,
+                        axisLabel: {
+                            interval: 0,
+                            rotate: 30
+                        }
+                    }
+                ],
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '百分比',
+                        min: 0,
+                        max: 100,
+                        axisLabel: {
+                            formatter: '{value}%'
+                        }
+                    }
+                ],
+                series: [
+                    {
+                        name: '得分率',
+                        type: 'bar',
+                        data: questionChartData.scoring_rates
+                    },
+                    {
+                        name: '难度系数',
+                        type: 'line',
+                        data: questionChartData.difficulty_rates
+                    }
+                ]
+            };
+            questionTypeChart.setOption(questionTypeOption);
+
+            // 响应式处理
+            window.addEventListener('resize', function () {
+                classComparisonChart.resize();
+                scoreDistributionChart.resize();
+                questionTypeChart.resize();
+            });
+        });
+    </script>
+{% endif %}
+
+{% block extra_css %}
+<style>
+    .card {
+        border: none;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        margin-bottom: 1.5rem;
+    }
+
+    .card-header {
+        background-color: rgba(0, 0, 0, .03);
+        border-bottom: 1px solid rgba(0, 0, 0, .125);
+        padding: 0.75rem 1.25rem;
+    }
+
+    .progress {
+        background-color: #f8f9fa;
+        border-radius: 0.25rem;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, .1);
+    }
+
+    .table th {
+        border-top: none;
+        font-weight: 500;
+        color: #495057;
+    }
+
+    .badge {
+        padding: 0.4em 0.6em;
+        font-weight: 500;
+    }
+
+    .form-select:focus {
+        border-color: #80bdff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, .25);
+    }
+
+    .btn-primary {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+
+    .btn-primary:hover {
+        background-color: #0b5ed7;
+        border-color: #0a58ca;
+    }
+
+    /* 统计卡片样式 */
+    .card .text-muted {
+        color: #6c757d !important;
+        font-size: 0.875rem;
+    }
+
+    .card h3 {
+        color: #212529;
+        font-weight: 500;
+        margin: 0;
+    }
+
+    /* 图表容器样式 */
+    [id$="Chart"] {
+        border-radius: 0.25rem;
+        background: #fff;
+        padding: 1rem;
+    }
+
+    /* 响应式调整 */
+    @media (max-width: 768px) {
+        .col-md-2 {
+            margin-bottom: 1rem;
+        }
+
+        .card-body {
+            padding: 1rem;
+        }
+
+        .table-responsive {
+            margin: 0 -1rem;
+        }
+    }
+</style>
+{% endblock %}
